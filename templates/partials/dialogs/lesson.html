@@ -1,0 +1,72 @@
+<dialog id="lesson-dialog" class="dialog">
+    <form id="lesson-form" class="dialog-card">
+        <header class="dialog-header">
+            <div>
+                <div class="eyebrow">Расписание</div>
+                <h2 id="lesson-dialog-title">Новое занятие</h2>
+            </div>
+            <button type="button" class="icon-button" data-close>×</button>
+</header>
+
+        <input id="lesson-id" type="hidden">
+
+        <div class="form-grid">
+            <label>Неделя
+                <select id="lesson-week">
+                    <option value="1">1-я неделя</option>
+                    <option value="2">2-я неделя</option>
+                </select>
+            </label>
+            <label>День
+                <select id="lesson-day">
+                    <option value="1">Понедельник</option>
+                    <option value="2">Вторник</option>
+                    <option value="3">Среда</option>
+                    <option value="4">Четверг</option>
+                    <option value="5">Пятница</option>
+                    <option value="6">Суббота</option>
+                </select>
+            </label>
+            <label>Пара
+                <select id="lesson-period">
+                    <option value="1">1 пара</option>
+                    <option value="2">2 пара</option>
+                    <option value="3">3 пара</option>
+                    <option value="4">4 пара</option>
+                </select>
+            </label>
+            <label>Группа<select id="lesson-group" class="js-searchable"></select></label>
+            <label>Дисциплина<select id="lesson-subject" class="js-searchable"></select></label>
+            <label>Преподаватель (подгр. 1)<select id="lesson-teacher" class="js-searchable"></select></label>
+            <label>Аудитория (подгр. 1)<select id="lesson-classroom" class="js-searchable"></select></label>
+            <label>Тип
+                <select id="lesson-type">
+                    <option>Лекция</option>
+                    <option>Практика</option>
+                    <option>Лабораторная</option>
+                    <option>Семинар</option>
+                </select>
+            </label>
+            <label class="full-width checkbox-row lesson-split-toggle">
+                <input id="lesson-split" type="checkbox">
+                <span>Разделить на подгруппы (2 преподавателя)</span>
+            </label>
+            <label id="lesson-teacher2-wrap" class="hidden">Преподаватель (подгр. 2)
+                <select id="lesson-teacher2" class="js-searchable"></select>
+            </label>
+            <label id="lesson-classroom2-wrap" class="hidden">Аудитория (подгр. 2)
+                <select id="lesson-classroom2" class="js-searchable"></select>
+            </label>
+            <label class="full-width">Примечание
+                <textarea id="lesson-note" rows="3" placeholder="Необязательно"></textarea>
+            </label>
+        </div>
+
+        <footer class="dialog-actions">
+            <button id="delete-lesson-button" type="button" class="button button-danger hidden">Удалить</button>
+            <span></span>
+            <button type="button" class="button button-secondary" data-close>Отмена</button>
+            <button class="button button-primary">Сохранить</button>
+        </footer>
+    </form>
+</dialog>

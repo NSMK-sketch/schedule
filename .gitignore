@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Flask / local database
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/*.log
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files
+.env
+.env.*
+!.env.example

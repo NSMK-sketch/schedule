@@ -1,0 +1,21 @@
+<dialog id="directory-dialog" class="dialog dialog-form">
+    <form id="directory-form" class="dialog-card dialog-card-wide">
+        <header class="dialog-header">
+            <div>
+                <div class="eyebrow">Справочник</div>
+                <h2 id="directory-title">Новая запись</h2>
+            </div>
+            <button type="button" class="icon-button" data-close>×</button>
+        </header>
+
+        <input id="directory-type" type="hidden">
+        <input id="directory-id" type="hidden">
+        <div id="directory-error" class="dialog-error hidden" role="alert" aria-live="assertive"></div>
+        <div id="directory-fields" class="glpi-form-fields"></div>
+
+        <footer class="dialog-actions">
+            <button type="button" class="button button-secondary" data-close>Отмена</button>
+            <button id="directory-submit" class="button button-primary" type="submit">Сохранить</button>
+        </footer>
+    </form>
+</dialog>

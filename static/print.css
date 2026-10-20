@@ -1,0 +1,199 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    color: #1e293b;
+    margin: 24px;
+    background: #fff;
+}
+
+.print-toolbar {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.print-toolbar button {
+    padding: 8px 16px;
+    border: none;
+    background: #2878d6;
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.print-toolbar a {
+    color: #64748b;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.print-header h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+}
+
+.print-header p {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.week-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 24px 0 8px;
+}
+
+table.print-grid {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+table.print-grid th,
+table.print-grid td {
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+    font-size: 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+table.print-grid th {
+    background: #f1f5f9;
+    text-align: center;
+}
+
+table.print-grid td.day-cell {
+    font-weight: 600;
+    white-space: nowrap;
+    background: #f8fafc;
+    width: 120px;
+}
+
+table.print-grid td.pair-cell {
+    text-align: center;
+    width: 48px;
+    color: #64748b;
+}
+
+table.print-grid td.empty {
+    color: #94a3b8;
+    text-align: center;
+}
+
+.print-board-wrap {
+    page-break-inside: avoid;
+    margin-bottom: 20px;
+}
+
+table.print-board {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+    margin-bottom: 8px;
+}
+
+table.print-board th,
+table.print-board td {
+    border: 1px solid #94a3b8;
+    padding: 4px 5px;
+    font-size: 10px;
+    vertical-align: top;
+    word-wrap: break-word;
+}
+
+table.print-board th {
+    background: #e2e8f0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+table.print-board th.corner {
+    width: 72px;
+    background: #f1f5f9;
+}
+
+table.print-board td.pair-label {
+    width: 72px;
+    text-align: center;
+    font-weight: 800;
+    font-size: 12px;
+    background: #f8fafc;
+    vertical-align: middle;
+}
+
+table.print-board td.day-label {
+    background: #dbeafe;
+    font-weight: 800;
+    font-size: 11px;
+    padding: 5px 8px;
+}
+
+table.print-board td.empty-cell {
+    min-height: 36px;
+    height: 42px;
+}
+
+table.print-board td.lesson-cell {
+    background: #fff;
+}
+
+.cell-teacher {
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 1.25;
+    margin-bottom: 2px;
+}
+
+.cell-subject {
+    color: #475569;
+    font-size: 10px;
+    line-height: 1.25;
+}
+
+.cell-room {
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 9px;
+}
+
+.loading,
+.empty {
+    color: #94a3b8;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        margin: 8mm;
+    }
+
+    .print-board-wrap {
+        page-break-after: always;
+    }
+
+    .print-board-wrap:last-child {
+        page-break-after: auto;
+    }
+
+    table.print-board {
+        font-size: 9px;
+    }
+}
+
+@media print and (orientation: landscape) {
+    table.print-board th,
+    table.print-board td {
+        font-size: 9px;
+    }
+}

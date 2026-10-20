@@ -1,0 +1,27 @@
+<section id="schedule-view" class="content-section content-section-flush">
+    <section class="schedule-panel schedule-panel-full">
+        <div class="schedule-groups">
+            <label class="groups-search">
+                <span aria-hidden="true">⌕</span>
+                <input id="search-input" type="search" placeholder="Поиск по расписанию…">
+            </label>
+            <label class="schedule-group-select-wrap">
+                <span class="sr-only">Группа</span>
+                <select id="schedule-groups-list" class="schedule-group-select" aria-label="Фильтр по группе"></select>
+            </label>
+            <div class="stats-inline schedule-stats">
+                <span><b id="stat-lessons">0</b> занятий</span>
+                <span><b id="stat-groups">0</b> групп</span>
+            </div>
+        </div>
+
+        <div class="schedule-scroll-shell">
+            <div class="schedule-wrap" id="schedule-wrap">
+                <div class="schedule" id="schedule-grid">
+                    <div class="schedule-head" id="schedule-head"></div>
+                    <div id="schedule-body"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+</section>

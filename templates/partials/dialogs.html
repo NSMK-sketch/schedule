@@ -1,0 +1,22 @@
+{% include "partials/dialogs/lesson.html" %}
+{% include "partials/dialogs/copy_week.html" %}
+{% include "partials/dialogs/teacher_subjects.html" %}
+{% include "partials/dialogs/directory.html" %}
+{% include "partials/dialogs/confirm.html" %}
+
+<dialog id="conflict-dialog" class="dialog conflict-dialog">
+    <form method="dialog" class="dialog-card">
+        <header class="dialog-header">
+            <div>
+                <div class="eyebrow">Проверка расписания</div>
+                <h2>Конфликт расписания</h2>
+            </div>
+            <button type="submit" class="icon-button">×</button>
+        </header>
+        <p id="conflict-message" class="conflict-message"></p>
+        <footer class="dialog-actions">
+            <span></span>
+            <button type="submit" class="button button-primary">Понятно</button>
+        </footer>
+    </form>
+</dialog>

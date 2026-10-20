@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Печать расписания</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='print.css') }}">
+</head>
+<body>
+    <div class="print-toolbar no-print">
+        <button type="button" id="print-button">Печать</button>
+        <a href="/">← Назад к расписанию</a>
+    </div>
+
+    <div id="print-header" class="print-header">
+        <p class="loading">Загрузка…</p>
+    </div>
+
+    <div id="print-tables"></div>
+
+    <script
+        src="{{ url_for('static', filename='print.js') }}"
+        data-mode="{{ mode }}"
+        {% if group_id is not none %}data-group-id="{{ group_id }}"{% endif %}
+    ></script>
+</body>
+</html>

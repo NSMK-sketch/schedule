@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {% include "partials/login.html" %}
+
+    <div id="app-shell" class="app-shell hidden">
+        {% include "partials/sidebar.html" %}
+
+        <main class="main-content">
+            {% include "partials/schedule_view.html" %}
+            {% include "partials/directories_view.html" %}
+        </main>
+    </div>
+
+    {% include "partials/dialogs.html" %}
+{% endblock %}

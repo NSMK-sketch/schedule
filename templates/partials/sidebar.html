@@ -1,0 +1,77 @@
+<aside class="sidebar">
+    <div class="sidebar-brand brand">
+        <div class="brand-mark">Н</div>
+        <div>
+            <strong>НСМК</strong>
+            <span>Расписание</span>
+        </div>
+        <button class="theme-toggle theme-toggle-side" id="theme-toggle" type="button" aria-label="Переключить тему" title="Переключить тему">
+            <span id="theme-icon" aria-hidden="true">☀</span>
+        </button>
+    </div>
+
+    <nav class="side-nav">
+        <div class="side-section side-directories admin-only" id="side-directories">
+            <button class="side-accordion" id="directories-toggle" type="button" aria-expanded="false">
+                <span class="side-ico">▤</span>
+                <span>Справочники</span>
+                <span class="side-accordion-chevron" aria-hidden="true">▸</span>
+            </button>
+            <div class="side-accordion-body" id="directories-menu" hidden>
+                <button class="side-link side-link-sub" data-view="directory" data-directory="groups" type="button">
+                    <span class="side-ico">Г</span>
+                    Группы
+                    <span class="side-count" data-count="groups">0</span>
+                </button>
+                <button class="side-link side-link-sub" data-view="directory" data-directory="teachers" type="button">
+                    <span class="side-ico">П</span>
+                    Преподаватели
+                    <span class="side-count" data-count="teachers">0</span>
+                </button>
+                <button class="side-link side-link-sub" data-view="directory" data-directory="subjects" type="button">
+                    <span class="side-ico">Д</span>
+                    Дисциплины
+                    <span class="side-count" data-count="subjects">0</span>
+                </button>
+                <button class="side-link side-link-sub" data-view="directory" data-directory="classrooms" type="button">
+                    <span class="side-ico">А</span>
+                    Аудитории
+                    <span class="side-count" data-count="classrooms">0</span>
+                </button>
+            </div>
+        </div>
+
+        <button class="side-link active" data-view="schedule" type="button">
+            <span class="side-ico">▦</span>
+            Расписание
+        </button>
+
+        <div class="side-section side-schedule-tools" id="side-schedule-tools">
+            <div class="side-section-title">Неделя</div>
+            <div class="side-week-switcher">
+                <button class="week-button active" data-week="1" type="button">1-я</button>
+                <button class="week-button" data-week="2" type="button">2-я</button>
+            </div>
+            <div id="current-week-label" class="side-week-label">1-я неделя</div>
+
+            <button id="print-all-button" class="side-action" type="button">Печать всего</button>
+            <button id="print-group-button" class="side-action" type="button">Печать группы</button>
+            <button id="copy-week-button" class="side-action admin-only" type="button">Копировать неделю</button>
+            <button id="add-lesson-button" class="side-action side-action-primary admin-only" type="button">+ Новое занятие</button>
+
+            <div class="side-section-title side-teachers-title">
+                Преподаватели
+                <span><b id="stat-teachers">0</b></span>
+            </div>
+            <label class="side-teacher-search">
+                <span aria-hidden="true">⌕</span>
+                <input id="teacher-search" type="search" placeholder="Поиск…">
+            </label>
+            <div id="teachers-panel-list" class="side-teachers-list"></div>
+        </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+        <button id="logout-button" class="side-logout" type="button">Выйти</button>
+    </div>
+</aside>

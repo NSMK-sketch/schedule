@@ -1,0 +1,61 @@
+<section id="directories-view" class="content-section hidden">
+    <div class="glpi-header">
+        <div class="glpi-breadcrumb">
+            <span>Справочники</span>
+            <span class="glpi-sep">›</span>
+            <strong id="directory-breadcrumb">Группы</strong>
+        </div>
+        <div class="glpi-header-main">
+            <div>
+                <h2 id="directory-heading">Группы</h2>
+                <p id="directory-description">Учебные группы колледжа</p>
+            </div>
+            <div class="glpi-header-actions admin-only">
+                <button
+                    id="directory-import-button"
+                    class="button button-secondary hidden"
+                    type="button"
+                    title="Импорт из Excel"
+                >
+                    Импорт Excel
+                </button>
+                <button
+                    id="directory-clear-button"
+                    class="button button-danger"
+                    type="button"
+                    title="Удалить все записи справочника"
+                >
+                    Удалить все
+                </button>
+                <button id="directory-add-button" class="button button-primary" type="button">
+                    + Добавить
+                </button>
+            </div>
+            <input
+                id="directory-import-file"
+                class="hidden"
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                hidden
+            >
+        </div>
+    </div>
+
+    <div class="glpi-toolbar">
+        <label class="glpi-search">
+            <span aria-hidden="true">⌕</span>
+            <input id="directory-search" type="search" placeholder="Поиск в списке…">
+        </label>
+        <div class="glpi-toolbar-meta">
+            <span id="directory-total">0 записей</span>
+        </div>
+    </div>
+
+    <div class="glpi-table-wrap">
+        <table class="glpi-table" id="directory-table">
+            <thead id="directory-thead"></thead>
+            <tbody id="directory-tbody"></tbody>
+        </table>
+        <div id="directory-empty" class="glpi-empty hidden">Записей пока нет.</div>
+    </div>
+</section>
