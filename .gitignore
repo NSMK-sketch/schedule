@@ -19,6 +19,7 @@ instance/
 # OS
 .DS_Store
 Thumbs.db
+~$*
 
 # Test / coverage
 .pytest_cache/
@@ -29,3 +30,4 @@ htmlcov/
 .env
 .env.*
 !.env.example
+tocken.txt

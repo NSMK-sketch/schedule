@@ -3,12 +3,28 @@
         <div class="schedule-groups">
             <label class="groups-search">
                 <span aria-hidden="true">⌕</span>
-                <input id="search-input" type="search" placeholder="Поиск по расписанию…">
+                <input id="search-input" type="search" placeholder="Поиск (фамилия, предмет…)">
             </label>
-            <label class="schedule-group-select-wrap">
+            <label class="schedule-filter-select-wrap">
                 <span class="sr-only">Группа</span>
-                <select id="schedule-groups-list" class="schedule-group-select" aria-label="Фильтр по группе"></select>
+                <select id="schedule-groups-list" class="schedule-filter-select" aria-label="Фильтр по группе"></select>
             </label>
+            <label class="schedule-filter-select-wrap">
+                <span class="sr-only">Преподаватель</span>
+                <select id="schedule-teachers-list" class="schedule-filter-select" aria-label="Фильтр по преподавателю"></select>
+            </label>
+            <label class="schedule-filter-select-wrap">
+                <span class="sr-only">Предмет</span>
+                <select id="schedule-subjects-list" class="schedule-filter-select" aria-label="Фильтр по предмету"></select>
+            </label>
+            <fieldset class="course-filters" aria-label="Фильтр по курсу">
+                <legend class="sr-only">Курс</legend>
+                <span class="course-filters-label">Курс</span>
+                <label class="course-filter"><input type="checkbox" value="1" checked> 1</label>
+                <label class="course-filter"><input type="checkbox" value="2" checked> 2</label>
+                <label class="course-filter"><input type="checkbox" value="3" checked> 3</label>
+                <label class="course-filter"><input type="checkbox" value="4" checked> 4</label>
+            </fieldset>
             <div class="stats-inline schedule-stats">
                 <span><b id="stat-lessons">0</b> занятий</span>
                 <span><b id="stat-groups">0</b> групп</span>

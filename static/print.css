@@ -34,17 +34,17 @@ body {
 
 .print-header h1 {
     margin: 0 0 4px;
-    font-size: 22px;
+    font-size: 24px;
 }
 
 .print-header p {
     margin: 0;
     color: #64748b;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .week-title {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
     margin: 24px 0 8px;
 }
@@ -59,7 +59,7 @@ table.print-grid th,
 table.print-grid td {
     border: 1px solid #cbd5e1;
     padding: 6px 8px;
-    font-size: 12px;
+    font-size: 13px;
     text-align: left;
     vertical-align: top;
 }
@@ -67,6 +67,7 @@ table.print-grid td {
 table.print-grid th {
     background: #f1f5f9;
     text-align: center;
+    font-weight: 700;
 }
 
 table.print-grid td.day-cell {
@@ -78,8 +79,11 @@ table.print-grid td.day-cell {
 
 table.print-grid td.pair-cell {
     text-align: center;
-    width: 48px;
-    color: #64748b;
+    vertical-align: middle;
+    width: 52px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #334155;
 }
 
 table.print-grid td.empty {
@@ -102,8 +106,8 @@ table.print-board {
 table.print-board th,
 table.print-board td {
     border: 1px solid #94a3b8;
-    padding: 4px 5px;
-    font-size: 10px;
+    padding: 5px 6px;
+    font-size: 11px;
     vertical-align: top;
     word-wrap: break-word;
 }
@@ -111,57 +115,92 @@ table.print-board td {
 table.print-board th {
     background: #e2e8f0;
     text-align: center;
+    font-size: 13px;
+    font-weight: 800;
+    vertical-align: middle;
+}
+
+table.print-board th.corner {
+    width: 56px;
+    background: #f1f5f9;
     font-size: 11px;
     font-weight: 700;
 }
 
-table.print-board th.corner {
-    width: 72px;
-    background: #f1f5f9;
-}
-
 table.print-board td.pair-label {
-    width: 72px;
+    width: 56px;
     text-align: center;
-    font-weight: 800;
-    font-size: 12px;
-    background: #f8fafc;
     vertical-align: middle;
+    font-weight: 800;
+    font-size: 16px;
+    background: #f8fafc;
+    color: #0f172a;
 }
 
 table.print-board td.day-label {
     background: #dbeafe;
     font-weight: 800;
-    font-size: 11px;
-    padding: 5px 8px;
+    font-size: 13px;
+    padding: 6px 8px;
+    text-align: left;
 }
 
 table.print-board td.empty-cell {
-    min-height: 36px;
-    height: 42px;
+    min-height: 44px;
+    height: 48px;
+}
+
+table.print-board td.empty-cell-compact {
+    min-height: 18px;
+    height: 20px;
+    padding: 2px;
+}
+
+table.print-board.print-board-filtered td.pair-label {
+    font-size: 15px;
 }
 
 table.print-board td.lesson-cell {
     background: #fff;
 }
 
-.cell-teacher {
-    font-weight: 800;
-    font-size: 11px;
-    line-height: 1.25;
-    margin-bottom: 2px;
+.print-header .filter-tags {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.print-header .filter-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 700;
 }
 
 .cell-subject {
-    color: #475569;
-    font-size: 10px;
+    font-weight: 800;
+    font-size: 12px;
     line-height: 1.25;
+    color: #0f172a;
+    margin-bottom: 3px;
+}
+
+.cell-teacher {
+    font-weight: 600;
+    font-size: 11px;
+    line-height: 1.25;
+    color: #334155;
 }
 
 .cell-room {
-    margin-top: 2px;
+    margin-top: 3px;
     color: #64748b;
-    font-size: 9px;
+    font-size: 10px;
+    line-height: 1.2;
 }
 
 .loading,
@@ -175,7 +214,7 @@ table.print-board td.lesson-cell {
     }
 
     body {
-        margin: 8mm;
+        margin: 6mm;
     }
 
     .print-board-wrap {
@@ -186,14 +225,45 @@ table.print-board td.lesson-cell {
         page-break-after: auto;
     }
 
-    table.print-board {
+    table.print-board th {
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    table.print-board td.pair-label {
+        font-size: 15px;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .cell-subject {
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .cell-teacher {
+        font-size: 10px;
+    }
+
+    .cell-room {
         font-size: 9px;
     }
 }
 
 @media print and (orientation: landscape) {
-    table.print-board th,
-    table.print-board td {
-        font-size: 9px;
+    table.print-board th {
+        font-size: 12px;
+    }
+
+    table.print-board td.pair-label {
+        font-size: 15px;
+    }
+
+    .cell-subject {
+        font-size: 11px;
+    }
+
+    .cell-teacher {
+        font-size: 10px;
     }
 }

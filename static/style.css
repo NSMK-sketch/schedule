@@ -94,7 +94,9 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 14px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font: 16px/1.45 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
 
 button,
@@ -142,27 +144,27 @@ button {
 }
 
 .brand-mark {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     display: grid;
     place-items: center;
     border-radius: 10px;
     background: var(--primary);
     color: #fff;
-    font-size: 19px;
+    font-size: 20px;
     font-weight: 900;
 }
 
 .brand strong {
     display: block;
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .brand span {
     display: block;
     margin-top: 2px;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
 }
 
 .brand-large {
@@ -268,64 +270,32 @@ textarea:focus {
     color: var(--text);
 }
 
-.demo-hint {
-    margin-top: 17px;
-    padding: 12px;
-    border-radius: 10px;
-    background: var(--soft);
-    color: var(--muted);
-    font-size: 11px;
+.setup-card {
+    width: min(520px, 100%);
 }
 
-.demo-hint > strong {
-    display: block;
-    margin-bottom: 9px;
-    color: var(--text);
-    font-size: 12px;
-}
-
-.demo-credentials {
+.setup-optional {
     display: grid;
-    gap: 7px;
+    gap: 12px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+}
+
+.setup-optional strong {
+    font-size: 13px;
+}
+
+.setup-hint {
+    margin: 0;
+    font-size: 12px;
     line-height: 1.45;
 }
 
-.demo-credentials code {
-    padding: 2px 5px;
-    border-radius: 5px;
-    background: var(--surface);
-    color: var(--text);
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-}
-
-.demo-account {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 3px;
-    min-width: 0;
-    padding: 9px 10px;
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    background: var(--surface);
-    color: var(--text);
-    text-align: left;
-    cursor: pointer;
-}
-
-.demo-account:hover {
-    border-color: var(--primary);
-    background: var(--surface-hover);
-}
-
-.demo-account span {
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.demo-account small {
-    color: var(--muted);
-    font-size: 10px;
+.setup-error {
+    margin: 0;
+    color: var(--danger);
+    font-size: 13px;
+    line-height: 1.45;
 }
 
 /* Main application */
@@ -338,10 +308,10 @@ textarea:focus {
     position: fixed;
     inset: 0 auto 0 0;
     z-index: 20;
-    width: 248px;
+    width: 280px;
     display: flex;
     flex-direction: column;
-    padding: 14px 10px;
+    padding: 14px 12px;
     background: var(--sidebar);
     color: var(--sidebar-text);
 }
@@ -353,7 +323,21 @@ textarea:focus {
     padding: 4px 8px 16px;
 }
 
-.sidebar-brand > div:nth-child(2) {
+.sidebar-brand-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+    color: inherit;
+    text-decoration: none;
+}
+
+.sidebar-brand-link:hover .brand-mark {
+    filter: brightness(1.08);
+}
+
+.sidebar-brand-link > div:last-child {
     min-width: 0;
     flex: 1;
 }
@@ -396,7 +380,7 @@ textarea:focus {
 .side-section-title {
     padding: 8px 12px 4px;
     color: var(--sidebar-muted);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -413,7 +397,7 @@ textarea:focus {
     background: transparent;
     color: var(--sidebar-muted);
     text-align: left;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 800;
 }
 
@@ -449,20 +433,20 @@ textarea:focus {
     background: transparent;
     color: var(--sidebar-muted);
     text-align: left;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 800;
 }
 
 .side-link-sub {
     padding: 9px 12px 9px 14px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
 }
 
 .side-ico {
     width: 19px;
     text-align: center;
-    font-size: 14px;
+    font-size: 15px;
     flex-shrink: 0;
 }
 
@@ -473,7 +457,7 @@ textarea:focus {
     border-radius: 999px;
     background: rgba(127, 146, 170, 0.18);
     color: var(--sidebar-muted);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 800;
     text-align: center;
 }
@@ -504,28 +488,28 @@ textarea:focus {
 }
 
 .side-week-switcher .week-button {
-    min-height: 30px;
+    min-height: 34px;
     padding: 4px 6px;
-    font-size: 11px;
+    font-size: 13px;
 }
 
 .side-week-label {
     margin: 2px 2px 6px;
     color: var(--sidebar-muted);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
 }
 
 .side-action {
     width: 100%;
-    min-height: 34px;
+    min-height: 38px;
     margin-top: 4px;
     padding: 0 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: transparent;
     color: var(--sidebar-text);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 800;
     text-align: left;
 }
@@ -556,7 +540,7 @@ textarea:focus {
 
 .side-teachers-title span {
     color: var(--sidebar-muted);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 800;
     letter-spacing: 0;
     text-transform: none;
@@ -580,18 +564,18 @@ textarea:focus {
 
 .side-teacher-search input {
     width: 100%;
-    min-height: 30px;
+    min-height: 34px;
     border: 0;
     background: transparent;
     color: var(--sidebar-text);
     outline: none;
-    font-size: 12px;
+    font-size: 14px;
 }
 
 .side-teachers-list {
     display: grid;
-    gap: 2px;
-    max-height: min(280px, 32vh);
+    gap: 4px;
+    max-height: min(360px, 40vh);
     overflow: auto;
     margin: 0 -2px;
     padding: 0 2px 4px;
@@ -603,22 +587,38 @@ textarea:focus {
 
 .side-teachers-list .teacher-main {
     color: var(--sidebar-text);
-    padding: 6px 4px;
+    padding: 8px 6px;
+}
+
+.side-teachers-list .teacher-item b {
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: 0;
 }
 
 .side-teachers-list .teacher-item small {
-    max-width: 140px;
+    max-width: 170px;
     color: var(--sidebar-muted);
+    font-size: 11px;
+}
+
+.side-teachers-list .teacher-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    font-size: 11px;
 }
 
 .side-teachers-list .teacher-subject-list {
-    margin-left: 36px;
+    margin-left: 40px;
 }
 
 .side-teachers-list .teacher-subject-draggable {
     background: var(--sidebar-2);
     color: var(--sidebar-text);
-    font-size: 10px;
+    font-size: 12px;
+    padding: 7px 9px;
 }
 
 .sidebar-bottom {
@@ -629,18 +629,18 @@ textarea:focus {
 
 .side-logout {
     width: 100%;
-    min-height: 35px;
+    min-height: 38px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: transparent;
     color: var(--sidebar-muted);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 800;
 }
 
 .main-content {
-    width: calc(100% - 248px);
-    margin-left: 248px;
+    width: calc(100% - 280px);
+    margin-left: 280px;
     min-height: 100vh;
 }
 
@@ -749,14 +749,14 @@ textarea:focus {
 
 .panel-head b {
     display: block;
-    font-size: 13px;
+    font-size: 15px;
 }
 
 .panel-head span {
     display: block;
     margin-top: 3px;
     color: var(--muted);
-    font-size: 9px;
+    font-size: 12px;
 }
 
 .stats-inline {
@@ -766,12 +766,13 @@ textarea:focus {
 
 .stats-inline span {
     margin: 0;
+    font-size: 13px;
 }
 
 .stats-inline b {
     display: inline;
     color: var(--primary);
-    font-size: 12px;
+    font-size: 14px;
 }
 
 .schedule-scroll-shell {
@@ -856,11 +857,11 @@ textarea:focus {
     z-index: 6;
     align-items: flex-start;
     text-align: left;
-    font-size: 11px;
+    font-size: 13px;
 }
 
 .schedule-head .head-group b {
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .schedule-empty-head {
@@ -887,12 +888,12 @@ textarea:focus {
 }
 
 .day-banner b {
-    font-size: 12px;
+    font-size: 14px;
 }
 
 .day-banner small {
     color: var(--primary);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
 }
 
@@ -914,14 +915,14 @@ textarea:focus {
 }
 
 .period-cell b {
-    font-size: 16px;
+    font-size: 18px;
     font-variant-numeric: tabular-nums;
     line-height: 1;
 }
 
 .period-cell small {
     color: var(--muted);
-    font-size: 9px;
+    font-size: 11px;
     line-height: 1.25;
 }
 
@@ -938,6 +939,33 @@ textarea:focus {
 .schedule-cell.drag-over {
     background: rgba(49, 94, 234, 0.07);
     box-shadow: inset 0 0 0 2px rgba(49, 94, 234, 0.18);
+}
+
+/* При поиске/фильтрах: пустые колонки скрыты в JS, пустые ячейки — компактные */
+.schedule.is-filtered .schedule-cell:not(:has(.lesson-card)) {
+    min-height: 28px;
+    padding: 2px 4px;
+}
+
+.schedule.is-filtered .schedule-row-compact .period-cell {
+    min-height: 28px;
+    padding: 4px 6px;
+}
+
+.schedule.is-filtered .schedule-row-compact .period-cell small {
+    display: none;
+}
+
+.schedule.is-filtered .schedule-row-compact:has(.lesson-card) .period-cell {
+    min-height: 72px;
+}
+
+.schedule.is-filtered .schedule-row-compact:has(.lesson-card) .period-cell small {
+    display: block;
+}
+
+.schedule.is-filtered .schedule-row-compact:has(.lesson-card) .schedule-cell:not(:has(.lesson-card)) {
+    min-height: 72px;
 }
 
 .lesson-card {
@@ -963,7 +991,7 @@ textarea:focus {
 
 .lesson-teacher {
     color: var(--text);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 800;
     line-height: 1.25;
     letter-spacing: 0.01em;
@@ -971,7 +999,7 @@ textarea:focus {
 
 .lesson-subject {
     color: var(--muted);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     line-height: 1.3;
     overflow-wrap: anywhere;
@@ -979,7 +1007,7 @@ textarea:focus {
 
 .lesson-room {
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     line-height: 1.2;
 }
@@ -1045,24 +1073,51 @@ textarea:focus {
 
 .groups-search input {
     width: 100%;
-    min-height: 31px;
+    min-height: 34px;
     border: 0;
     background: transparent;
     color: var(--text);
     outline: none;
-    font-size: 12px;
+    font-size: 14px;
 }
 
+.schedule-filter-select-wrap {
+    display: flex;
+    min-width: 0;
+    flex: 0 1 200px;
+}
+
+.schedule-filter-select {
+    width: 100%;
+    min-width: 140px;
+    max-width: 260px;
+    min-height: 34px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    outline: none;
+    cursor: pointer;
+}
+
+.schedule-filter-select:focus {
+    border-color: var(--primary);
+}
+
+/* backward-compatible alias if old class remains */
 .schedule-group-select-wrap {
     display: flex;
     min-width: 0;
-    flex: 0 1 240px;
+    flex: 0 1 200px;
 }
 
 .schedule-group-select {
     width: 100%;
-    min-width: 160px;
-    max-width: 280px;
+    min-width: 140px;
+    max-width: 260px;
     min-height: 31px;
     padding: 5px 10px;
     border: 1px solid var(--border);
@@ -1075,8 +1130,52 @@ textarea:focus {
     cursor: pointer;
 }
 
-.schedule-group-select:focus {
-    border-color: var(--primary);
+.course-filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    min-height: 31px;
+}
+
+.course-filters-label {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 2px;
+}
+
+.course-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+}
+
+.course-filter:hover {
+    background: rgba(49, 94, 234, 0.08);
+}
+
+.course-filter input {
+    width: 14px;
+    min-height: 14px;
+    margin: 0;
+    accent-color: var(--primary);
+    cursor: pointer;
 }
 
 .schedule-stats {
@@ -1156,12 +1255,12 @@ textarea:focus {
 }
 
 .teacher-subject-draggable {
-    padding: 6px 8px;
+    padding: 7px 9px;
     border: 1px solid var(--border);
     border-radius: 7px;
     background: var(--surface-2);
     color: var(--text);
-    font-size: 9px;
+    font-size: 12px;
     cursor: grab;
 }
 
@@ -1173,19 +1272,19 @@ textarea:focus {
 .teacher-no-subjects {
     padding: 5px 0;
     color: var(--muted);
-    font-size: 8px;
+    font-size: 12px;
 }
 
 .teacher-avatar {
-    width: 29px;
-    height: 29px;
+    width: 34px;
+    height: 34px;
     flex: 0 0 auto;
     display: grid;
     place-items: center;
-    border-radius: 7px;
+    border-radius: 8px;
     background: var(--teacher-color);
     color: #fff;
-    font-size: 8px;
+    font-size: 11px;
     font-weight: 900;
 }
 
@@ -1195,15 +1294,15 @@ textarea:focus {
 }
 
 .teacher-item b {
-    font-size: 9px;
+    font-size: 13px;
 }
 
 .teacher-item small {
-    max-width: 165px;
+    max-width: 180px;
     margin-top: 2px;
     overflow: hidden;
     color: var(--muted);
-    font-size: 7px;
+    font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -1211,7 +1310,7 @@ textarea:focus {
 .schedule-help {
     margin-top: 9px;
     color: var(--muted);
-    font-size: 9px;
+    font-size: 12px;
 }
 
 .schedule-help span {

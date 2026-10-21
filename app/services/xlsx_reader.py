@@ -18,7 +18,116 @@ def _col_index(cell_ref: str) -> int:
     return index - 1
 
 
-def read_xlsx_rows(path: Path | str) -> list[list[str | None]]:
+def _workbook_sheet_targets(archive: ZipFile) -> list[tuple[str, str]]:
+    """Return [(sheet_title, worksheet_xml_path), ...] in workbook order."""
+    rels_ns = {
+        "pr": "http://schemas.openxmlformats.org/package/2006/relationships"
+    }
+    wb = ET.fromstring(archive.read("xl/workbook.xml"))
+    rels_root = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+    rid_to_target = {
+        rel.get("Id"): rel.get("Target")
+        for rel in rels_root.findall("pr:Relationship", rels_ns)
+    }
+
+    sheets: list[tuple[str, str]] = []
+    for sheet in wb.findall("m:sheets/m:sheet", NS):
+        title = sheet.get("name") or ""
+        rid = sheet.get(
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+        )
+        target = rid_to_target.get(rid or "")
+        if not target:
+            continue
+        target = target.lstrip("/")
+        if not target.startswith("xl/"):
+            target = f"xl/{target}"
+        sheets.append((title, target))
+    return sheets
+
+
+def _resolve_sheet_path(
+    archive: ZipFile,
+    *,
+    sheet_name: str | None = None,
+    sheet_index: int | None = None,
+) -> str:
+    sheets = _workbook_sheet_targets(archive)
+    if not sheets:
+        # Fallback: first worksheet xml in the archive
+        fallback = next(
+            (
+                name
+                for name in archive.namelist()
+                if name.startswith("xl/worksheets/sheet") and name.endswith(".xml")
+            ),
+            None,
+        )
+        if fallback is None:
+            raise ValueError("В файле Excel нет листа с данными.")
+        return fallback
+
+    if sheet_name is not None:
+        wanted = sheet_name.casefold().strip()
+        for title, path in sheets:
+            if title.casefold().strip() == wanted:
+                return path
+        known = ", ".join(title for title, _ in sheets)
+        raise ValueError(f"Лист «{sheet_name}» не найден. Доступны: {known}.")
+
+    index = 0 if sheet_index is None else sheet_index
+    if index < 0 or index >= len(sheets):
+        raise ValueError(
+            f"Индекс листа {index} вне диапазона 0…{len(sheets) - 1}."
+        )
+    return sheets[index][1]
+
+
+def _parse_sheet_rows(sheet: ET.Element, shared: list[str]) -> list[list[str | None]]:
+    rows: list[list[str | None]] = []
+    expected_row = 1
+
+    for row in sheet.findall("m:sheetData/m:row", NS):
+        row_number = int(row.get("r", expected_row))
+        while expected_row < row_number:
+            rows.append([])
+            expected_row += 1
+
+        cells: dict[int, str | None] = {}
+        max_index = -1
+        for cell in row.findall("m:c", NS):
+            ref = cell.get("r", "A1")
+            index = _col_index(ref)
+            max_index = max(max_index, index)
+            cell_type = cell.get("t")
+            value_node = cell.find("m:v", NS)
+            inline = cell.find("m:is", NS)
+
+            if cell_type == "inlineStr" and inline is not None:
+                texts = [node.text or "" for node in inline.findall(".//m:t", NS)]
+                cells[index] = "".join(texts)
+            elif value_node is None:
+                cells[index] = None
+            elif cell_type == "s":
+                cells[index] = shared[int(value_node.text)]
+            else:
+                cells[index] = value_node.text
+
+        rows.append(
+            [cells.get(i) for i in range(max_index + 1)] if max_index >= 0 else []
+        )
+        expected_row = row_number + 1
+
+    return rows
+
+
+def read_xlsx_rows(
+    path: Path | str,
+    *,
+    sheet_name: str | None = None,
+    sheet_index: int | None = None,
+) -> list[list[str | None]]:
+    """Read worksheet rows. By default uses the first sheet in workbook order."""
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(f"Файл не найден: {path.name}")
@@ -31,46 +140,11 @@ def read_xlsx_rows(path: Path | str) -> list[list[str | None]]:
                 texts = [node.text or "" for node in si.findall(".//m:t", NS)]
                 shared.append("".join(texts))
 
-        sheet_name = next(
-            (
-                name
-                for name in archive.namelist()
-                if name.startswith("xl/worksheets/sheet") and name.endswith(".xml")
-            ),
-            None,
+        sheet_path = _resolve_sheet_path(
+            archive, sheet_name=sheet_name, sheet_index=sheet_index
         )
-        if sheet_name is None:
-            raise ValueError("В файле Excel нет листа с данными.")
-
-        sheet = ET.fromstring(archive.read(sheet_name))
-        rows: list[list[str | None]] = []
-
-        for row in sheet.findall("m:sheetData/m:row", NS):
-            cells: dict[int, str | None] = {}
-            max_index = -1
-            for cell in row.findall("m:c", NS):
-                ref = cell.get("r", "A1")
-                index = _col_index(ref)
-                max_index = max(max_index, index)
-                cell_type = cell.get("t")
-                value_node = cell.find("m:v", NS)
-                inline = cell.find("m:is", NS)
-
-                if cell_type == "inlineStr" and inline is not None:
-                    texts = [node.text or "" for node in inline.findall(".//m:t", NS)]
-                    cells[index] = "".join(texts)
-                elif value_node is None:
-                    cells[index] = None
-                elif cell_type == "s":
-                    cells[index] = shared[int(value_node.text)]
-                else:
-                    cells[index] = value_node.text
-
-            rows.append(
-                [cells.get(i) for i in range(max_index + 1)] if max_index >= 0 else []
-            )
-
-        return rows
+        sheet = ET.fromstring(archive.read(sheet_path))
+        return _parse_sheet_rows(sheet, shared)
 
 
 def _cell_text(value) -> str:

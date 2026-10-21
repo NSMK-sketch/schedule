@@ -11,12 +11,15 @@
                 <div class="eyebrow">Проверка расписания</div>
                 <h2>Конфликт расписания</h2>
             </div>
-            <button type="submit" class="icon-button">×</button>
+            <button type="submit" class="icon-button" id="conflict-close">×</button>
         </header>
         <p id="conflict-message" class="conflict-message"></p>
         <footer class="dialog-actions">
             <span></span>
-            <button type="submit" class="button button-primary">Понятно</button>
+            <button type="submit" class="button button-secondary">Отмена</button>
+            <button type="button" id="conflict-force-button" class="button button-primary hidden">
+                Все равно разместить
+            </button>
         </footer>
     </form>
 </dialog>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0c1a2e">
+    <title>Расписание студентов — НСМК</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Onest:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='student.css') }}">
+</head>
+<body>
+    <div class="student-bg" aria-hidden="true"></div>
+
+    <header class="student-top">
+        <div class="student-brand">
+            <div class="student-mark">Н</div>
+            <div>
+                <strong>НСМК</strong>
+                <span>Расписание студентов</span>
+            </div>
+        </div>
+        <a id="staff-link" class="student-staff-link" href="/">Вход для сотрудников</a>
+    </header>
+
+    <main class="student-main">
+        <section class="student-controls">
+            <label class="field">
+                <span>Группа</span>
+                <select id="group-select" aria-label="Выбор группы">
+                    <option value="">Выберите группу…</option>
+                </select>
+            </label>
+
+            <div class="week-switch" role="group" aria-label="Учебная неделя">
+                <button type="button" class="week-btn active" data-week="1">1-я неделя</button>
+                <button type="button" class="week-btn" data-week="2">2-я неделя</button>
+            </div>
+        </section>
+
+        <section id="group-meta" class="group-meta hidden"></section>
+        <section id="schedule-root" class="schedule-root">
+            <div class="empty-state">
+                <p>Выберите свою группу — расписание откроется ниже.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="student-foot">
+        <span>Данные обновляются из общего расписания колледжа</span>
+    </footer>
+
+    <script src="https://st.max.ru/js/max-web-app.js"></script>
+    <script src="{{ url_for('static', filename='student.js') }}"></script>
+</body>
+</html>

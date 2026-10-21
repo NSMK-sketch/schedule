@@ -2,6 +2,9 @@ const state = {
     user: null,
     week: 1,
     group: "",
+    teacher: "",
+    subject: "",
+    courses: new Set([1, 2, 3, 4]),
     search: "",
     view: "schedule",
     directory: "groups",
@@ -188,6 +191,8 @@ async function apiUpload(url, formData) {
     return parseApiResponse(response);
 }
 
+let pendingForceAction = null;
+
 function toast(message, type = "success") {
     if (type === "error" && String(message).startsWith("Конфликт:")) {
         showConflictDialog(message);
@@ -203,17 +208,76 @@ function toast(message, type = "success") {
 }
 
 
-function showConflictDialog(message) {
+function showConflictDialog(message, forceAction = null) {
     const dialog = $("#conflict-dialog");
     if (!dialog) {
         return;
     }
 
+    pendingForceAction = forceAction;
     $("#conflict-message").textContent = message.replace(/^Конфликт:\s*/, "");
+    const forceButton = $("#conflict-force-button");
+    if (forceButton) {
+        forceButton.classList.toggle("hidden", !forceAction);
+    }
     if (dialog.open) {
         dialog.close();
     }
     dialog.showModal();
+}
+
+async function forcePlaceDespiteConflict() {
+    const action = pendingForceAction;
+    pendingForceAction = null;
+
+    const dialog = $("#conflict-dialog");
+    if (dialog?.open) {
+        dialog.close();
+    }
+
+    if (!action) {
+        return;
+    }
+
+    try {
+        await api(action.url, {
+            method: action.method,
+            body: JSON.stringify({
+                ...action.data,
+                force: true,
+            }),
+        });
+
+        if (action.closeLessonDialog) {
+            $("#lesson-dialog")?.close();
+        }
+        toast(action.successMessage || "Занятие размещено.");
+        if (action.week != null) {
+            state.week = action.week;
+            updateWeekButtons();
+        }
+        await loadLessons();
+        render();
+    } catch (error) {
+        toast(error.message, "error");
+    }
+}
+
+function lessonPayloadFromState(lesson, overrides = {}) {
+    return {
+        week: lesson.week,
+        weekday: lesson.weekday,
+        period: lesson.period,
+        group_id: lesson.group_id,
+        subject_id: lesson.subject_id ?? null,
+        teacher_id: lesson.teacher_id,
+        teacher2_id: lesson.teacher2_id ?? null,
+        classroom_id: lesson.classroom_id ?? null,
+        classroom2_id: lesson.classroom2_id ?? null,
+        lesson_type: lesson.lesson_type || "Лекция",
+        note: lesson.note || "",
+        ...overrides,
+    };
 }
 
 function confirmDialog(message, title = "Удаление", confirmLabel = "Удалить") {
@@ -362,11 +426,81 @@ async function loadLessons() {
     state.lessons = await api(`/api/lessons?${params}`);
 }
 
-function visibleGroups() {
-    if (!state.group) {
-        return state.groups;
+function groupsMatchingCourses() {
+    const selected = state.courses;
+    return state.groups
+        .filter((group) => selected.has(Number(group.course) || 1))
+        .slice()
+        .sort((a, b) => {
+            const courseDiff = (Number(a.course) || 1) - (Number(b.course) || 1);
+            if (courseDiff !== 0) {
+                return courseDiff;
+            }
+            return String(a.name).localeCompare(String(b.name), "ru");
+        });
+}
+
+function hasScheduleSlotFilters() {
+    return Boolean(
+        state.search.trim() || state.teacher || state.subject,
+    );
+}
+
+function lessonMatchesFilters(lesson) {
+    if (state.teacher) {
+        const teacherId = String(state.teacher);
+        const primary = String(lesson.teacher_id ?? "");
+        const secondary = String(lesson.teacher2_id ?? "");
+        if (primary !== teacherId && secondary !== teacherId) {
+            return false;
+        }
     }
-    return state.groups.filter((group) => String(group.id) === String(state.group));
+
+    if (state.subject) {
+        if (String(lesson.subject_id ?? "") !== String(state.subject)) {
+            return false;
+        }
+    }
+
+    const query = state.search.toLowerCase().trim();
+    if (!query) {
+        return true;
+    }
+
+    return [
+        lesson.subject_name,
+        lesson.subject_short,
+        lesson.group_name,
+        lesson.teacher_name,
+        lesson.teacher_short,
+        lesson.teacher2_name,
+        lesson.teacher2_short,
+        lesson.classroom_name,
+        lesson.classroom2_name,
+    ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+}
+
+function filteredLessons() {
+    return state.lessons.filter(lessonMatchesFilters);
+}
+
+function visibleGroups() {
+    let groups = groupsMatchingCourses();
+    if (state.group) {
+        groups = groups.filter((group) => String(group.id) === String(state.group));
+    }
+
+    if (hasScheduleSlotFilters()) {
+        const groupIds = new Set(
+            filteredLessons().map((lesson) => Number(lesson.group_id)),
+        );
+        groups = groups.filter((group) => groupIds.has(Number(group.id)));
+    }
+
+    return groups;
 }
 
 function shortTeacherName(lesson, which = 1) {
@@ -415,8 +549,14 @@ function render() {
     renderDirectoryCounts();
     renderDirectoryTable();
 
-    $("#stat-lessons").textContent = state.lessons.length;
-    $("#stat-groups").textContent = state.groups.length;
+    const groupsOnScreen = visibleGroups();
+    const groupIds = new Set(groupsOnScreen.map((group) => Number(group.id)));
+    const lessonsOnScreen = filteredLessons().filter((lesson) =>
+        groupIds.has(Number(lesson.group_id)),
+    );
+
+    $("#stat-lessons").textContent = lessonsOnScreen.length;
+    $("#stat-groups").textContent = groupsOnScreen.length;
     $("#stat-teachers").textContent = state.teachers.length;
 }
 
@@ -465,33 +605,66 @@ function switchView(view, directory = null) {
     }
 }
 
-function renderScheduleGroups() {
-    const select = $("#schedule-groups-list");
+function fillFilterSelect(select, previous, allLabel, items, labelKey) {
     if (!select) {
-        return;
+        return previous;
     }
 
-    const previous = state.group === "" ? "" : String(state.group);
     select.innerHTML = "";
-
     const allOption = document.createElement("option");
     allOption.value = "";
-    allOption.textContent = "Все группы";
+    allOption.textContent = allLabel;
     select.append(allOption);
 
-    state.groups.forEach((group) => {
+    items.forEach((item) => {
         const option = document.createElement("option");
-        option.value = String(group.id);
-        option.textContent = group.name;
+        option.value = String(item.id);
+        option.textContent = item[labelKey];
         select.append(option);
     });
 
     const hasSelected =
-        previous === "" || state.groups.some((group) => String(group.id) === previous);
+        previous === "" || items.some((item) => String(item.id) === previous);
     select.value = hasSelected ? previous : "";
-    if (!hasSelected) {
-        state.group = "";
-    }
+    return hasSelected ? previous : "";
+}
+
+function renderScheduleGroups() {
+    state.group = fillFilterSelect(
+        $("#schedule-groups-list"),
+        state.group === "" ? "" : String(state.group),
+        "Все группы",
+        groupsMatchingCourses(),
+        "name",
+    );
+
+    const teachers = state.teachers
+        .slice()
+        .sort((a, b) =>
+            String(a.full_name).localeCompare(String(b.full_name), "ru"),
+        );
+    state.teacher = fillFilterSelect(
+        $("#schedule-teachers-list"),
+        state.teacher === "" ? "" : String(state.teacher),
+        "Все преподаватели",
+        teachers,
+        "full_name",
+    );
+
+    const subjects = state.subjects
+        .slice()
+        .sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
+    state.subject = fillFilterSelect(
+        $("#schedule-subjects-list"),
+        state.subject === "" ? "" : String(state.subject),
+        "Все предметы",
+        subjects,
+        "name",
+    );
+
+    document.querySelectorAll(".course-filter input[type='checkbox']").forEach((input) => {
+        input.checked = state.courses.has(Number(input.value));
+    });
 }
 
 function setScheduleColumns(groupCount) {
@@ -513,10 +686,16 @@ function renderSchedule() {
     preventScheduleContainerDrag();
 
     const groups = visibleGroups();
+    const lessons = filteredLessons().filter((lesson) =>
+        groups.some((group) => Number(group.id) === Number(lesson.group_id)),
+    );
+    const slotFilters = hasScheduleSlotFilters();
     const head = $("#schedule-head");
     const body = $("#schedule-body");
+    const grid = $("#schedule-grid");
     head.innerHTML = "";
     body.innerHTML = "";
+    grid?.classList.toggle("is-filtered", slotFilters);
 
     const corner = document.createElement("div");
     corner.className = "head-day";
@@ -526,7 +705,9 @@ function renderSchedule() {
     if (!groups.length) {
         const empty = document.createElement("div");
         empty.className = "schedule-empty-head";
-        empty.textContent = "Добавьте учебные группы в справочнике";
+        empty.textContent = slotFilters
+            ? "Нет занятий по текущим фильтрам"
+            : "Добавьте учебные группы в справочнике";
         head.append(empty);
         setScheduleColumns(1);
         return;
@@ -541,28 +722,28 @@ function renderSchedule() {
 
     setScheduleColumns(groups.length);
 
-    const query = state.search.toLowerCase().trim();
-    const filteredLessons = state.lessons.filter((lesson) => {
-        if (!query) {
-            return true;
-        }
-        return [
-            lesson.subject_name,
-            lesson.subject_short,
-            lesson.group_name,
-            lesson.teacher_name,
-            lesson.teacher_short,
-            lesson.teacher2_name,
-            lesson.teacher2_short,
-            lesson.classroom_name,
-            lesson.classroom2_name,
-        ]
-            .join(" ")
-            .toLowerCase()
-            .includes(query);
-    });
+    const lessonAt = new Set(
+        lessons.map(
+            (lesson) =>
+                `${lesson.weekday}-${lesson.period}-${lesson.group_id}`,
+        ),
+    );
+    const slotHasLesson = (weekday, period) =>
+        groups.some((group) =>
+            lessonAt.has(`${weekday}-${period}-${group.id}`),
+        );
 
     for (let weekday = 1; weekday <= 6; weekday += 1) {
+        const periods = [];
+        for (let period = 1; period <= 4; period += 1) {
+            if (!slotFilters || slotHasLesson(weekday, period)) {
+                periods.push(period);
+            }
+        }
+        if (!periods.length) {
+            continue;
+        }
+
         const dayRow = document.createElement("div");
         dayRow.className = "schedule-day-row";
         dayRow.style.gridTemplateColumns = `112px repeat(${groups.length}, minmax(150px, 1fr))`;
@@ -581,9 +762,12 @@ function renderSchedule() {
         dayRow.append(daySpan);
         body.append(dayRow);
 
-        for (let period = 1; period <= 4; period += 1) {
+        periods.forEach((period) => {
             const row = document.createElement("div");
             row.className = "schedule-row";
+            if (slotFilters) {
+                row.classList.add("schedule-row-compact");
+            }
             row.style.gridTemplateColumns = `112px repeat(${groups.length}, minmax(150px, 1fr))`;
 
             const periodCell = document.createElement("div");
@@ -599,10 +783,10 @@ function renderSchedule() {
             });
 
             body.append(row);
-        }
+        });
     }
 
-    filteredLessons.forEach((lesson) => {
+    lessons.forEach((lesson) => {
         const cell = document.querySelector(
             `.schedule-cell[data-weekday="${lesson.weekday}"][data-period="${lesson.period}"][data-group-id="${lesson.group_id}"]`,
         );
@@ -610,7 +794,6 @@ function renderSchedule() {
             cell.append(createCard(lesson));
         }
     });
-
 }
 
 function preventScheduleContainerDrag() {
@@ -935,21 +1118,31 @@ async function moveLesson(id, weekday, period, groupId) {
         return;
     }
 
+    const data = lessonPayloadFromState(lesson, {
+        weekday,
+        period,
+        group_id: groupId,
+    });
+
     try {
         await api(`/api/lessons/${id}`, {
             method: "PUT",
-            body: JSON.stringify({
-                ...lesson,
-                weekday,
-                period,
-                group_id: groupId,
-            }),
+            body: JSON.stringify(data),
         });
 
         toast("Занятие перемещено.");
         await loadLessons();
         render();
     } catch (error) {
+        if (String(error.message).startsWith("Конфликт:")) {
+            showConflictDialog(error.message, {
+                url: `/api/lessons/${id}`,
+                method: "PUT",
+                data,
+                successMessage: "Занятие размещено несмотря на конфликт.",
+            });
+            return;
+        }
         toast(error.message, "error");
     }
 }
@@ -1272,9 +1465,12 @@ async function saveLesson(event) {
         return;
     }
 
+    const url = id ? `/api/lessons/${id}` : "/api/lessons";
+    const method = id ? "PUT" : "POST";
+
     try {
-        await api(id ? `/api/lessons/${id}` : "/api/lessons", {
-            method: id ? "PUT" : "POST",
+        await api(url, {
+            method,
             body: JSON.stringify(data),
         });
 
@@ -1285,6 +1481,19 @@ async function saveLesson(event) {
         await loadLessons();
         render();
     } catch (error) {
+        if (String(error.message).startsWith("Конфликт:")) {
+            showConflictDialog(error.message, {
+                url,
+                method,
+                data,
+                closeLessonDialog: true,
+                week: data.week,
+                successMessage: id
+                    ? "Занятие обновлено несмотря на конфликт."
+                    : "Занятие размещено несмотря на конфликт.",
+            });
+            return;
+        }
         toast(error.message, "error");
     }
 }
@@ -1934,23 +2143,50 @@ async function saveDirectory(event) {
     }
 }
 
-function openPrintGroup() {
-    if (!state.groups.length) {
-        toast("Сначала добавьте учебную группу.", "error");
-        return;
+function scheduleFilterQuery() {
+    const params = new URLSearchParams();
+    const groups = visibleGroups();
+    if (groups.length) {
+        params.set("groups", groups.map((group) => group.id).join(","));
     }
-
-    const groupId = state.group || state.groups[0].id;
-    window.open(`/print/${groupId}`, "_blank");
+    if (state.teacher) {
+        params.set("teacher_id", state.teacher);
+    }
+    if (state.subject) {
+        params.set("subject_id", state.subject);
+    }
+    if (state.search.trim()) {
+        params.set("q", state.search.trim());
+    }
+    return params;
 }
 
-function openPrintAll() {
-    if (!state.groups.length) {
-        toast("Сначала добавьте учебные группы.", "error");
+function openPrint() {
+    const groups = visibleGroups();
+    if (!groups.length) {
+        toast("Нет групп по текущим фильтрам.", "error");
         return;
     }
 
-    window.open("/print/all", "_blank");
+    const params = scheduleFilterQuery();
+    window.open(`/print/all?${params.toString()}`, "_blank");
+}
+
+function exportExcel() {
+    const groups = visibleGroups();
+    if (!groups.length) {
+        toast("Нет групп по текущим фильтрам.", "error");
+        return;
+    }
+
+    const params = scheduleFilterQuery();
+    const link = document.createElement("a");
+    link.href = `/api/export/schedule.xlsx?${params.toString()}`;
+    link.download = "";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    toast(`Excel: ${groups.length} групп`);
 }
 
 async function copyWeek(event) {
@@ -2024,8 +2260,8 @@ function setup() {
         }
     });
 
-    $("#print-all-button").addEventListener("click", openPrintAll);
-    $("#print-group-button").addEventListener("click", openPrintGroup);
+    $("#print-button").addEventListener("click", openPrint);
+    $("#export-excel-button").addEventListener("click", exportExcel);
 
     $("#copy-week-button").addEventListener("click", () => {
         if (!isAdmin()) {
@@ -2046,14 +2282,44 @@ function setup() {
     });
     $("#delete-lesson-button").addEventListener("click", deleteCurrentLesson);
 
+    $("#conflict-force-button")?.addEventListener("click", (event) => {
+        event.preventDefault();
+        forcePlaceDespiteConflict();
+    });
+    $("#conflict-dialog")?.addEventListener("close", () => {
+        pendingForceAction = null;
+    });
+
     $("#schedule-groups-list")?.addEventListener("change", (event) => {
         state.group = event.target.value;
         render();
     });
 
+    $("#schedule-teachers-list")?.addEventListener("change", (event) => {
+        state.teacher = event.target.value;
+        render();
+    });
+
+    $("#schedule-subjects-list")?.addEventListener("change", (event) => {
+        state.subject = event.target.value;
+        render();
+    });
+
+    document.querySelectorAll(".course-filter input[type='checkbox']").forEach((input) => {
+        input.addEventListener("change", () => {
+            const course = Number(input.value);
+            if (input.checked) {
+                state.courses.add(course);
+            } else {
+                state.courses.delete(course);
+            }
+            render();
+        });
+    });
+
     $("#search-input").addEventListener("input", (event) => {
         state.search = event.target.value;
-        renderSchedule();
+        render();
     });
 
     $("#teacher-search").addEventListener("input", renderTeachersPanel);

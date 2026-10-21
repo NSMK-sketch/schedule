@@ -1,5 +1,7 @@
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, session, send_file
+from io import BytesIO
 
+from app.services.export_service import export_schedule_xlsx
 from app.services.lesson_service import (
     copy_week,
     create_lesson,
@@ -38,6 +40,48 @@ def get_lessons():
             request.args.get("week", type=int),
             request.args.get("group_id", type=int),
         )
+    )
+
+
+@lessons_bp.get("/export/schedule.xlsx")
+def export_schedule():
+    error = require_login()
+    if error:
+        return error
+
+    raw_groups = (request.args.get("groups") or "").strip()
+    group_ids = None
+    if raw_groups:
+        try:
+            group_ids = [
+                int(part.strip())
+                for part in raw_groups.split(",")
+                if part.strip()
+            ]
+        except ValueError:
+            return jsonify({"error": "Некорректный список групп."}), 400
+        if not group_ids:
+            group_ids = None
+
+    teacher_id = request.args.get("teacher_id", type=int)
+    subject_id = request.args.get("subject_id", type=int)
+    query = (request.args.get("q") or "").strip()
+
+    try:
+        payload, filename = export_schedule_xlsx(
+            group_ids,
+            teacher_id=teacher_id,
+            subject_id=subject_id,
+            query=query,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return send_file(
+        BytesIO(payload),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename,
     )
 
 

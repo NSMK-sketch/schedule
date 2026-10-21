@@ -1,10 +1,12 @@
 <aside class="sidebar">
     <div class="sidebar-brand brand">
-        <div class="brand-mark">Н</div>
-        <div>
-            <strong>НСМК</strong>
-            <span>Расписание</span>
-        </div>
+        <a class="sidebar-brand-link" href="/" title="На главную">
+            <div class="brand-mark">Н</div>
+            <div>
+                <strong>НСМК</strong>
+                <span>Расписание</span>
+            </div>
+        </a>
         <button class="theme-toggle theme-toggle-side" id="theme-toggle" type="button" aria-label="Переключить тему" title="Переключить тему">
             <span id="theme-icon" aria-hidden="true">☀</span>
         </button>
@@ -54,8 +56,8 @@
             </div>
             <div id="current-week-label" class="side-week-label">1-я неделя</div>
 
-            <button id="print-all-button" class="side-action" type="button">Печать всего</button>
-            <button id="print-group-button" class="side-action" type="button">Печать группы</button>
+            <button id="print-button" class="side-action" type="button">Печать</button>
+            <button id="export-excel-button" class="side-action" type="button">В Excel</button>
             <button id="copy-week-button" class="side-action admin-only" type="button">Копировать неделю</button>
             <button id="add-lesson-button" class="side-action side-action-primary admin-only" type="button">+ Новое занятие</button>
 

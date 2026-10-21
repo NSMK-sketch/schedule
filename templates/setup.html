@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Установка — Расписание НСМК</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <section class="login-screen">
+        <div class="login-card setup-card">
+            <div class="brand brand-large">
+                <div class="brand-mark">Н</div>
+                <div>
+                    <strong>Расписание</strong>
+                    <span>Учебный планировщик</span>
+                </div>
+            </div>
+
+            <div class="eyebrow">НСМК · первый запуск</div>
+            <h1>Установка</h1>
+            <p class="muted">
+                Задайте учётную запись администратора. Пароль сохранится только в виде хеша.
+                Студентам вход не нужен —
+                <a href="/student" style="color: var(--primary); font-weight: 700; text-decoration: none;">расписание уже открыто</a>.
+            </p>
+
+            <form id="setup-form" class="stack">
+                <label>
+                    Логин администратора
+                    <input id="setup-username" autocomplete="username" spellcheck="false" required>
+                </label>
+                <label>
+                    Пароль
+                    <input id="setup-password" type="password" autocomplete="new-password" minlength="8" required>
+                </label>
+                <label>
+                    Пароль ещё раз
+                    <input id="setup-password-confirm" type="password" autocomplete="new-password" minlength="8" required>
+                </label>
+
+                <div class="setup-optional">
+                    <strong>Бот MAX</strong>
+                    <p class="muted setup-hint">
+                        Необязательно. Вставьте токен из кабинета бота.
+                        Если у сайта уже есть публичный адрес HTTPS, укажите его —
+                        вебхук подпишется сам, секрет создастся и сохранится в базе.
+                        Без такого адреса бот будет забирать сообщения сам.
+                        Страницу мини-приложения <code>/student</code> нужно отдельно
+                        вписать в настройки бота на dev.max.ru.
+                    </p>
+                    <label>
+                        Токен бота
+                        <input id="setup-token" autocomplete="off" spellcheck="false">
+                    </label>
+                    <label>
+                        Адрес сайта
+                        <input id="setup-public-url" inputmode="url" placeholder="https://example.com" autocomplete="off" spellcheck="false">
+                    </label>
+                </div>
+
+                <p id="setup-error" class="setup-error hidden" role="alert"></p>
+                <button class="button button-primary" type="submit">Сохранить и войти</button>
+            </form>
+        </div>
+    </section>
+    <script src="{{ url_for('static', filename='setup.js') }}"></script>
+</body>
+</html>

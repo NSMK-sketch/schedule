@@ -1,7 +1,7 @@
 import os
 import sqlite3
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash
 from flask import current_app, g
 
 
@@ -11,6 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'teacher'
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS groups_ref (
@@ -337,39 +342,71 @@ def _seed_demo_data(db):
     )
 
 
-def init_db(app):
-    os.makedirs(os.path.dirname(app.config["DATABASE"]), exist_ok=True)
+# Removed on startup. These passwords were shipped with the app.
+_DEFAULT_CREDENTIALS = (
+    ("admin", "admin"),
+    ("teacher", "teacher"),
+)
 
-    with sqlite3.connect(app.config["DATABASE"]) as db:
+
+def remove_default_credentials(db):
+    removed = 0
+    rows = db.execute("SELECT id, username, password_hash FROM users").fetchall()
+    for user_id, username, password_hash in rows:
+        for known_user, known_password in _DEFAULT_CREDENTIALS:
+            if username != known_user:
+                continue
+            if check_password_hash(password_hash, known_password):
+                db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                removed += 1
+            break
+    return removed
+
+
+def remove_default_credentials_from_path(path):
+    db = sqlite3.connect(path)
+    try:
+        removed = remove_default_credentials(db)
+        db.commit()
+        return removed
+    finally:
+        db.close()
+
+
+def init_db(app):
+    database_dir = os.path.dirname(os.path.abspath(app.config["DATABASE"]))
+    os.makedirs(database_dir, exist_ok=True)
+
+    db = sqlite3.connect(app.config["DATABASE"])
+    try:
         db.execute("PRAGMA foreign_keys = ON")
+        db.execute("PRAGMA busy_timeout = 5000")
+        db.execute("PRAGMA journal_mode = WAL").fetchone()
         db.executescript(SCHEMA)
         _migrate_schema(db)
+        removed = remove_default_credentials(db)
+        if removed:
+            app.logger.warning(
+                "Removed %s account(s) that still had the built-in passwords",
+                removed,
+            )
 
-        demo_users = [
-            ("admin", generate_password_hash("admin"), "admin"),
-            ("teacher", generate_password_hash("teacher"), "teacher"),
-        ]
-        db.executemany(
-            """
-            INSERT OR IGNORE INTO users (username, password_hash, role)
-            VALUES (?, ?, ?)
-            """,
-            demo_users,
-        )
-
-        if app.config.get("SEED_DEMO_DATA", True):
+        if app.config.get("SEED_DEMO_DATA"):
             _seed_demo_data(db)
 
         db.commit()
+    finally:
+        db.close()
 
     app.teardown_appcontext(close_db)
 
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(current_app.config["DATABASE"])
+        g.db = sqlite3.connect(current_app.config["DATABASE"], timeout=5)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
+        g.db.execute("PRAGMA busy_timeout = 5000")
     return g.db
 
 
