@@ -503,6 +503,20 @@ class MaxIntegrationTestCase(unittest.TestCase):
             ("user", '{"id":7,"first_name":"Max"}'),
         ]
 
+    def _cyrillic_pairs(self, auth_date=None, start_param="g_1"):
+        if auth_date is None:
+            auth_date = str(int(time.time()))
+        user = (
+            '{"id":7,"first_name":"Иван",'
+            '"photo_url":"https://cdn.example/a%20b.jpg"}'
+        )
+        return [
+            ("auth_date", auth_date),
+            ("query_id", "abc"),
+            ("start_param", start_param),
+            ("user", user),
+        ]
+
     def test_init_data_accepts_valid_signature(self):
         raw = _init_data("test-token", self._pairs())
         parsed = validate_init_data(raw, "test-token")
@@ -510,14 +524,61 @@ class MaxIntegrationTestCase(unittest.TestCase):
         self.assertEqual(parsed["start_param"], "g_1")
         self.assertIn("Max", parsed["user"])
 
+    def test_init_data_accepts_cyrillic_user(self):
+        raw = _init_data("test-token", self._cyrillic_pairs())
+        with self.assertNoLogs("app.services.max_init_data", level="WARNING"):
+            parsed = validate_init_data(raw, "test-token")
+        self.assertEqual(parsed["start_param"], "g_1")
+        self.assertIn("Иван", parsed["user"])
+        self.assertIn("a%20b.jpg", parsed["user"])
+
+    def test_init_data_accepts_web_app_data_fragment(self):
+        raw = _init_data("test-token", self._cyrillic_pairs())
+        encoded = quote(raw, safe="")
+        official = f"https://web.max.ru/#WebAppData={encoded}&WebAppPlatform=web"
+        partial = "WebAppData=" + raw.replace("&", "%26").replace("=", "%3D")
+        for fragment in (official, partial):
+            parsed = validate_init_data(fragment, "test-token")
+            self.assertIsNotNone(parsed, fragment[:40])
+            self.assertIn("Иван", parsed["user"])
+            self.assertIn("a%20b.jpg", parsed["user"])
+
     def test_init_data_rejects_tampered_hash(self):
-        raw = _init_data("test-token", self._pairs()) + "ff"
-        self.assertIsNone(validate_init_data(raw, "test-token"))
+        raw = _init_data("test-token", self._cyrillic_pairs()) + "ff"
+        with self.assertLogs("app.services.max_init_data", level="WARNING") as captured:
+            self.assertIsNone(validate_init_data(raw, "test-token"))
+        text = "\n".join(captured.output)
+        self.assertIn("подпись не сошлась", text)
+        self.assertNotIn("test-token", text)
+        self.assertNotIn("Иван", text)
+        self.assertNotIn("a%20b.jpg", text)
+        self.assertNotIn(raw.split("hash=", 1)[1], text)
+
+    def test_init_data_rejects_missing_hash(self):
+        raw = _init_data("test-token", self._pairs()).split("&hash=", 1)[0]
+        with self.assertLogs("app.services.max_init_data", level="WARNING") as captured:
+            self.assertIsNone(validate_init_data(raw, "test-token"))
+        self.assertIn("нет hash", "\n".join(captured.output))
+
+    def test_init_data_rejects_duplicate_key(self):
+        raw = "query_id=other&" + _init_data("test-token", self._pairs())
+        with self.assertLogs("app.services.max_init_data", level="WARNING") as captured:
+            self.assertIsNone(validate_init_data(raw, "test-token"))
+        self.assertIn("повтор ключа", "\n".join(captured.output))
 
     def test_init_data_rejects_expired_auth_date(self):
-        auth_date = str(int(time.time()) - 7200)
-        raw = _init_data("test-token", self._pairs(auth_date=auth_date))
-        self.assertIsNone(validate_init_data(raw, "test-token"))
+        auth_date = int(time.time()) - 7200
+        raw = _init_data("test-token", self._pairs(auth_date=str(auth_date)))
+        fragment = "WebAppData=" + raw.replace("&", "%26").replace("=", "%3D")
+        with self.assertLogs("app.services.max_init_data", level="WARNING") as captured:
+            self.assertIsNone(validate_init_data(raw, "test-token", now=auth_date + 7200))
+            self.assertIsNone(
+                validate_init_data(fragment, "test-token", now=auth_date + 7200)
+            )
+        text = "\n".join(captured.output)
+        self.assertIn("auth_date старше 3600 секунд", text)
+        self.assertIn("age_seconds=7200", text)
+        self.assertNotIn("test-token", text)
 
     def test_session_endpoint_accepts_signed_launch(self):
         raw = _init_data("test-token", self._pairs(start_param="g_12"))
