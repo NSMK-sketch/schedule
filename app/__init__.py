@@ -77,9 +77,11 @@ def create_app(test_config=None):
     from app.routes.max_webhook import max_webhook_bp
     from app.routes.public import public_bp
     from app.routes.reference import reference_bp
+    from app.routes.settings import settings_bp
     from app.routes.setup import setup_bp
 
     app.register_blueprint(setup_bp, url_prefix="/api/setup")
+    app.register_blueprint(settings_bp, url_prefix="/api/settings")
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(public_bp, url_prefix="/api/public")
     app.register_blueprint(max_webhook_bp, url_prefix="/max")

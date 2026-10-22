@@ -1,0 +1,77 @@
+<dialog id="max-settings-dialog" class="dialog dialog-form">
+    <form id="max-settings-form" class="dialog-card">
+        <header class="dialog-header">
+            <div>
+                <div class="eyebrow">Администрирование</div>
+                <h2>Бот MAX</h2>
+            </div>
+            <button type="button" class="icon-button" data-close>×</button>
+        </header>
+
+        <p class="muted setup-hint">
+            Чтобы сохранить изменения, введите текущий пароль администратора.
+            Страницу мини-приложения в кабинете бота тоже нужно указать как
+            корень сайта (<code>/</code>).
+        </p>
+
+        <div id="max-settings-error" class="dialog-error hidden" role="alert"></div>
+
+        <div class="stack">
+            <label>
+                Текущий пароль администратора
+                <input id="max-settings-password" type="password" autocomplete="current-password" required>
+            </label>
+            <label>
+                Токен бота
+                <input id="max-settings-token" autocomplete="off" spellcheck="false" placeholder="Оставьте как есть, если не меняете">
+            </label>
+            <p id="max-settings-token-hint" class="muted setup-hint hidden"></p>
+            <label>
+                Адрес сайта
+                <input id="max-settings-public-url" inputmode="url" placeholder="https://example.com" autocomplete="off" spellcheck="false">
+            </label>
+            <p id="max-settings-meta" class="muted setup-hint"></p>
+        </div>
+
+        <footer class="dialog-actions max-settings-actions">
+            <button type="button" id="max-settings-reset" class="button button-danger button-quiet">
+                Сбросить установку
+            </button>
+            <span class="dialog-actions-spacer"></span>
+            <button type="button" class="button button-secondary" data-close>Отмена</button>
+            <button class="button button-primary" type="submit">Сохранить</button>
+        </footer>
+    </form>
+</dialog>
+
+<dialog id="max-reset-dialog" class="dialog confirm-dialog">
+    <form id="max-reset-form" class="dialog-card confirm-card">
+        <header class="dialog-header">
+            <div>
+                <div class="eyebrow">Осторожно</div>
+                <h2>Сброс установки</h2>
+            </div>
+            <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <p class="confirm-message">
+            Учётные записи администраторов будут удалены, настройки бота очищены.
+            После этого откроется страница установки. Расписание и справочники сохранятся.
+        </p>
+        <div id="max-reset-error" class="dialog-error hidden" role="alert"></div>
+        <div class="stack">
+            <label>
+                Пароль администратора
+                <input id="max-reset-password" type="password" autocomplete="current-password" required>
+            </label>
+            <label>
+                Введите слово «сбросить»
+                <input id="max-reset-confirm" autocomplete="off" spellcheck="false" required>
+            </label>
+        </div>
+        <footer class="dialog-actions">
+            <span></span>
+            <button type="button" class="button button-secondary" data-close>Отмена</button>
+            <button type="submit" class="button button-danger">Сбросить</button>
+        </footer>
+    </form>
+</dialog>

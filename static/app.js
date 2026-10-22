@@ -2242,12 +2242,153 @@ function updateWeekButtons() {
     $("#current-week-label").textContent = `${state.week}-я неделя`;
 }
 
+function setDialogError(node, message) {
+    if (!node) {
+        return;
+    }
+    if (!message) {
+        node.textContent = "";
+        node.classList.add("hidden");
+        return;
+    }
+    node.textContent = message;
+    node.classList.remove("hidden");
+}
+
+async function openMaxSettings() {
+    if (!isAdmin()) {
+        return;
+    }
+
+    const dialog = $("#max-settings-dialog");
+    const form = $("#max-settings-form");
+    const error = $("#max-settings-error");
+    const tokenInput = $("#max-settings-token");
+    const urlInput = $("#max-settings-public-url");
+    const hint = $("#max-settings-token-hint");
+    const meta = $("#max-settings-meta");
+
+    setDialogError(error, "");
+    form.reset();
+    tokenInput.readOnly = false;
+    hint.classList.add("hidden");
+    meta.textContent = "Загрузка…";
+
+    dialog.showModal();
+
+    try {
+        const data = await api("/api/settings/max");
+        tokenInput.value = data.token_masked || "";
+        tokenInput.dataset.masked = data.token_masked || "";
+        urlInput.value = data.public_url || "";
+        const bits = [];
+        if (data.bot_username) {
+            bits.push(`бот @${data.bot_username}`);
+        }
+        if (data.webhook_url) {
+            bits.push(`вебхук ${data.webhook_url}`);
+        }
+        meta.textContent = bits.length
+            ? bits.join(" · ")
+            : "Бот ещё не настроен.";
+        if (data.env_token_locked) {
+            tokenInput.readOnly = true;
+            hint.textContent =
+                "Токен задан переменной окружения MAX_BOT_TOKEN и здесь не меняется.";
+            hint.classList.remove("hidden");
+        } else if (data.token_set) {
+            hint.textContent =
+                "Поле уже заполнено маской. Вставьте новый токен только если хотите его заменить.";
+            hint.classList.remove("hidden");
+        }
+    } catch (err) {
+        setDialogError(error, err.message);
+        meta.textContent = "";
+    }
+}
+
+async function saveMaxSettings(event) {
+    event.preventDefault();
+    if (!isAdmin()) {
+        return;
+    }
+
+    const error = $("#max-settings-error");
+    const button = $("#max-settings-form button[type='submit']");
+    const tokenInput = $("#max-settings-token");
+    setDialogError(error, "");
+    button.disabled = true;
+
+    let token = tokenInput.value.trim();
+    if (token && token === (tokenInput.dataset.masked || "")) {
+        token = "";
+    }
+
+    try {
+        await api("/api/settings/max", {
+            method: "PUT",
+            body: JSON.stringify({
+                password: $("#max-settings-password").value,
+                max_bot_token: token,
+                public_url: $("#max-settings-public-url").value.trim(),
+            }),
+        });
+        $("#max-settings-dialog").close();
+        toast("Настройки бота сохранены.");
+    } catch (err) {
+        setDialogError(error, err.message);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+function openMaxReset() {
+    if (!isAdmin()) {
+        return;
+    }
+    $("#max-settings-dialog")?.close();
+    const form = $("#max-reset-form");
+    form.reset();
+    setDialogError($("#max-reset-error"), "");
+    $("#max-reset-dialog").showModal();
+}
+
+async function submitMaxReset(event) {
+    event.preventDefault();
+    if (!isAdmin()) {
+        return;
+    }
+
+    const error = $("#max-reset-error");
+    const button = $("#max-reset-form button[type='submit']");
+    setDialogError(error, "");
+    button.disabled = true;
+
+    try {
+        const data = await api("/api/settings/reset-install", {
+            method: "POST",
+            body: JSON.stringify({
+                password: $("#max-reset-password").value,
+                confirm: $("#max-reset-confirm").value.trim(),
+            }),
+        });
+        window.location.href = data.redirect || "/admin";
+    } catch (err) {
+        setDialogError(error, err.message);
+        button.disabled = false;
+    }
+}
+
 function setup() {
     setupScheduleEdgeScroll();
 
     $("#login-form").addEventListener("submit", login);
 
     $("#logout-button").addEventListener("click", logout);
+    $("#max-settings-button")?.addEventListener("click", openMaxSettings);
+    $("#max-settings-form")?.addEventListener("submit", saveMaxSettings);
+    $("#max-settings-reset")?.addEventListener("click", openMaxReset);
+    $("#max-reset-form")?.addEventListener("submit", submitMaxReset);
 
     $("#directories-toggle")?.addEventListener("click", () => {
         const open = $("#directories-toggle").getAttribute("aria-expanded") !== "true";

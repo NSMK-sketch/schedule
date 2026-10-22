@@ -68,6 +68,63 @@ class ScheduleAppTestCase(unittest.TestCase):
         self.assertNotIn("Демо-данные", page)
         self.assertNotIn(">admin</code>", page)
 
+    def test_max_settings_require_admin_password(self):
+        denied = self.client.get("/api/settings/max")
+        self.assertEqual(denied.status_code, 401)
+
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "teacher", "password": "teacher"},
+        )
+        forbidden = self.client.get("/api/settings/max")
+        self.assertEqual(forbidden.status_code, 403)
+
+        self.client.post("/api/auth/logout")
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin"},
+        )
+        ok = self.client.get("/api/settings/max")
+        self.assertEqual(ok.status_code, 200)
+        self.assertIn("token_set", ok.get_json())
+
+        bad = self.client.put(
+            "/api/settings/max",
+            json={"password": "wrong", "public_url": ""},
+        )
+        self.assertEqual(bad.status_code, 401)
+
+        saved = self.client.put(
+            "/api/settings/max",
+            json={"password": "admin", "public_url": ""},
+        )
+        self.assertEqual(saved.status_code, 200, saved.get_json())
+        self.assertTrue(saved.get_json()["ok"])
+
+    def test_reset_install_removes_admin_and_opens_setup(self):
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin"},
+        )
+        bad_confirm = self.client.post(
+            "/api/settings/reset-install",
+            json={"password": "admin", "confirm": "no"},
+        )
+        self.assertEqual(bad_confirm.status_code, 400)
+
+        reset = self.client.post(
+            "/api/settings/reset-install",
+            json={"password": "admin", "confirm": "сбросить"},
+        )
+        self.assertEqual(reset.status_code, 200, reset.get_json())
+        self.assertEqual(reset.get_json()["redirect"], "/admin")
+
+        me = self.client.get("/api/auth/me").get_json()
+        self.assertFalse(me["authenticated"])
+        page = self.client.get("/admin").get_data(as_text=True)
+        self.assertIn("setup-form", page)
+        self.assertFalse(self.client.get("/api/setup/status").get_json()["installed"])
+
     def test_login_admin(self):
         response = self.client.post(
             "/api/auth/login",

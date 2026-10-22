@@ -190,6 +190,26 @@ def _poll_loop(app, client):
             time.sleep(3)
 
 
+def refresh_webhook(app):
+    """Re-subscribe the webhook with the current token and secret."""
+    token = str(app.config.get("MAX_BOT_TOKEN") or "").strip()
+    webhook_url = str(app.config.get("MAX_WEBHOOK_URL") or "").strip()
+    if not token or not webhook_url:
+        return False
+    client = MaxClient(
+        token,
+        app.config.get("MAX_API_BASE") or "https://platform-api2.max.ru",
+    )
+    client.subscribe(
+        webhook_url,
+        app.config.get("MAX_WEBHOOK_SECRET") or "",
+        _UPDATE_TYPES,
+    )
+    remember_bot(app, client)
+    app.logger.info("MAX webhook subscription updated")
+    return True
+
+
 def start_bot(app):
     """Subscribe to a webhook, or poll while developing. Never both."""
     global _polling_started
@@ -210,6 +230,7 @@ def start_bot(app):
                 app.config.get("MAX_WEBHOOK_SECRET") or "",
                 _UPDATE_TYPES,
             )
+            remember_bot(app, client)
             app.logger.info("MAX webhook subscription updated")
         except (MaxApiError, OSError):
             app.logger.exception("MAX webhook subscription failed")
