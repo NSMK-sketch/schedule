@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#0c1a2e">
+    <meta name="theme-color" content="#ffffff">
     <title>Расписание студентов — НСМК</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Onest:wght@500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='student.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='student.css') }}?v=9">
 </head>
 <body>
     <div class="student-bg" aria-hidden="true"></div>
 
     <header class="student-top">
-        <div class="student-brand">
-            <div class="student-mark">Н</div>
-            <div>
-                <strong>НСМК</strong>
-                <span>Расписание студентов</span>
-            </div>
-        </div>
-        <a id="staff-link" class="student-staff-link" href="/">Вход для сотрудников</a>
+        <a class="student-logo-link" href="https://nmt54.ru/" rel="home">
+            <img
+                class="student-logo"
+                src="{{ url_for('static', filename='img/nsmk-logo.png') }}?v=9"
+                alt="НСМК"
+            >
+        </a>
+        <span class="student-title">Расписание занятий</span>
     </header>
 
     <main class="student-main">
@@ -46,10 +46,6 @@
             </div>
         </section>
     </main>
-
-    <footer class="student-foot">
-        <span>Данные обновляются из общего расписания колледжа</span>
-    </footer>
 
     <script src="https://st.max.ru/js/max-web-app.js"></script>
     <script src="{{ url_for('static', filename='student.js') }}"></script>

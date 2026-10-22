@@ -147,7 +147,7 @@ def perform_install(data):
         bot_user_id = me.get("user_id")
         if public_url:
             webhook_url = public_url + "/max/webhook"
-            miniapp_url = public_url + "/student"
+            miniapp_url = public_url
             webhook_secret = secrets.token_urlsafe(32)
             try:
                 client.subscribe(webhook_url, webhook_secret, _UPDATE_TYPES)

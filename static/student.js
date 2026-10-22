@@ -206,7 +206,7 @@ function renderSchedule() {
                     lesson.classroom_name || null,
                     lesson.classroom2_name || null,
                 ].filter(Boolean);
-                const color = lesson.subject_color || "#1f7aef";
+                const color = lesson.subject_color || "#a01914";
 
                 return `
                     <article class="lesson-row">
@@ -217,18 +217,11 @@ function renderSchedule() {
                         <div class="lesson-body" style="--lesson-color:${esc(color)}">
                             <div class="lesson-subject">${esc(lesson.subject_name || "Предмет не назначен")}</div>
                             <div class="lesson-teacher">${esc(teacher)}</div>
-                            <div class="lesson-meta">
-                                ${
-                                    rooms.length
-                                        ? `<span class="chip chip-room">ауд. ${esc(rooms.join(" / "))}</span>`
-                                        : ""
-                                }
-                                ${
-                                    lesson.lesson_type
-                                        ? `<span class="chip">${esc(lesson.lesson_type)}</span>`
-                                        : ""
-                                }
-                            </div>
+                            ${
+                                rooms.length
+                                    ? `<div class="lesson-meta"><span class="chip chip-room">ауд. ${esc(rooms.join(" / "))}</span></div>`
+                                    : ""
+                            }
                         </div>
                     </article>
                 `;
@@ -311,11 +304,6 @@ async function readMaxLaunch() {
     const initData = webApp && typeof webApp.initData === "string" ? webApp.initData.trim() : "";
     if (!initData) {
         return "";
-    }
-
-    const staffLink = $("#staff-link");
-    if (staffLink) {
-        staffLink.classList.add("hidden");
     }
 
     const response = await fetch("/api/public/max/session", {

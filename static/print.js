@@ -43,7 +43,7 @@ function formatTeacherSurnameInitials(fullName) {
 async function api(url) {
     const response = await fetch(url, { credentials: "same-origin" });
     if (response.status === 401) {
-        window.location.href = "/";
+        window.location.href = "/admin";
         throw new Error("Требуется авторизация.");
     }
     const data = await response.json();

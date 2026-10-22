@@ -29,7 +29,7 @@ document.getElementById("setup-form").addEventListener("submit", async (event) =
             button.disabled = false;
             return;
         }
-        window.location.href = "/";
+        window.location.href = "/admin";
     } catch (err) {
         error.textContent = "Нет связи с сервером.";
         error.classList.remove("hidden");

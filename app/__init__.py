@@ -48,24 +48,24 @@ def create_app(test_config=None):
 
     @app.get("/")
     def index():
+        return render_template("student.html")
+
+    @app.get("/admin")
+    def admin():
         if not has_admin():
             return render_template("setup.html")
         return render_template("index.html")
 
-    @app.get("/student")
-    def student():
-        return render_template("student.html")
-
     @app.get("/print/all")
     def print_all():
         if "user_id" not in session:
-            return redirect(url_for("index"))
+            return redirect(url_for("admin"))
         return render_template("print.html", mode="all", group_id=None)
 
     @app.get("/print/<int:group_id>")
     def print_group(group_id):
         if "user_id" not in session:
-            return redirect(url_for("index"))
+            return redirect(url_for("admin"))
         return render_template("print.html", mode="group", group_id=group_id)
 
     @app.get("/health")

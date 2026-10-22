@@ -63,7 +63,7 @@ class ScheduleAppTestCase(unittest.TestCase):
         self.assertEqual(response.get_json()["status"], "ok")
 
     def test_login_page_has_no_demo_password(self):
-        page = self.client.get("/").get_data(as_text=True)
+        page = self.client.get("/admin").get_data(as_text=True)
         self.assertIn("login-form", page)
         self.assertNotIn("Демо-данные", page)
         self.assertNotIn(">admin</code>", page)
@@ -485,7 +485,7 @@ class MaxIntegrationTestCase(unittest.TestCase):
                 "MAX_BOT_TOKEN": "test-token",
                 "MAX_WEBHOOK_SECRET": "test-secret",
                 "MAX_WEBHOOK_URL": "",
-                "MAX_MINIAPP_URL": "https://example.com/student",
+                "MAX_MINIAPP_URL": "https://example.com",
             }
         )
         self.client = self.app.test_client()
@@ -627,7 +627,7 @@ class MaxIntegrationTestCase(unittest.TestCase):
                 "chat_id": 5,
                 "user": {"user_id": 9, "name": "Студент"},
             },
-            "https://example.com/student",
+            "https://example.com",
             "nsmkraspi_bot",
             4242,
         )
@@ -719,7 +719,7 @@ class SetupTestCase(unittest.TestCase):
         self.assertEqual(users, 0)
 
     def test_home_is_the_setup_page(self):
-        response = self.client.get("/")
+        response = self.client.get("/admin")
         self.assertEqual(response.status_code, 200)
         page = response.get_data(as_text=True)
         self.assertIn("setup-form", page)
@@ -751,7 +751,7 @@ class SetupTestCase(unittest.TestCase):
             },
         )
         self.assertEqual(again.status_code, 409)
-        page = self.client.get("/").get_data(as_text=True)
+        page = self.client.get("/admin").get_data(as_text=True)
         self.assertNotIn("setup-form", page)
 
     def test_setup_rejects_a_short_or_mismatched_password(self):
