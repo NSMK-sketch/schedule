@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask, redirect, render_template, session, url_for
+from flask import Flask, redirect, render_template, request, session, url_for
 
 from app.config import Config, ensure_secret_key
 from app.database import init_db
@@ -49,6 +49,14 @@ def create_app(test_config=None):
     @app.get("/")
     def index():
         return render_template("student.html")
+
+    @app.get("/student")
+    def student_legacy():
+        """Old mini-app path from MAX; keep working until the bot URL is updated."""
+        target = "/"
+        if request.query_string:
+            target = f"/?{request.query_string.decode('utf-8', 'ignore')}"
+        return redirect(target, code=301)
 
     @app.get("/admin")
     def admin():
