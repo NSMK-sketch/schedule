@@ -30,6 +30,8 @@ const state = {
     week: 1,
     lessons: [],
     group: null,
+    substitutions: [],
+    upcoming: [],
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -151,6 +153,141 @@ function renderMeta() {
     `;
 }
 
+function lessonWord(count) {
+    const n = count % 100;
+    const n1 = count % 10;
+    if (n > 10 && n < 20) {
+        return "занятий";
+    }
+    if (n1 === 1) {
+        return "занятие";
+    }
+    if (n1 > 1 && n1 < 5) {
+        return "занятия";
+    }
+    return "занятий";
+}
+
+function sheetsForDay(day) {
+    return (state.substitutions || []).filter(
+        (sheet) => Number(sheet.week) === Number(state.week) && Number(sheet.weekday) === day,
+    );
+}
+
+function coveredPeriods(day) {
+    const covered = new Set();
+    sheetsForDay(day).forEach((sheet) => {
+        (sheet.rows || []).forEach((row) => {
+            (row.periods || []).forEach((period) => covered.add(Number(period)));
+        });
+    });
+    return covered;
+}
+
+function lessonCard(day, lesson) {
+    const teacher1 = formatTeacher(lesson.teacher_name, lesson.teacher_short);
+    const teacher2 = lesson.teacher2_name
+        ? formatTeacher(lesson.teacher2_name, lesson.teacher2_short)
+        : "";
+    const teacher = teacher2 ? `${teacher1} / ${teacher2}` : teacher1;
+    const rooms = [lesson.classroom_name || null, lesson.classroom2_name || null].filter(Boolean);
+    const color = lesson.subject_color || "#a01914";
+    return `
+        <article class="lesson-row">
+            <div class="lesson-period">
+                <b>${esc(lesson.period)}</b>
+                <small>${esc(bellTime(day, Number(lesson.period)))}</small>
+            </div>
+            <div class="lesson-body" style="--lesson-color:${esc(color)}">
+                <div class="lesson-subject">${esc(lesson.subject_name || "Предмет не назначен")}</div>
+                <div class="lesson-teacher">${esc(teacher)}</div>
+                ${
+                    rooms.length
+                        ? `<div class="lesson-meta"><span class="chip chip-room">ауд. ${esc(rooms.join(" / "))}</span></div>`
+                        : ""
+                }
+            </div>
+        </article>
+    `;
+}
+
+function changeCard(day, row) {
+    const periods = (row.periods || []).map(Number).filter((period) => period > 0);
+    const label = periods.join(",") || row.periods_label || "";
+    const times = periods.map((period) => bellTime(day, period)).filter(Boolean);
+    const instead = [row.old_subject, row.absent_teacher].filter(Boolean).join(", ");
+    const subject = row.cancelled ? "Занятие снято" : row.new_subject || "Предмет не указан";
+    return `
+        <article class="lesson-row is-change">
+            <div class="lesson-period">
+                <b>${esc(label)}</b>
+                <small>${esc(times.join(" / "))}</small>
+            </div>
+            <div class="lesson-body" style="--lesson-color:#a01914">
+                <div class="lesson-flags">
+                    <span class="change-badge${row.cancelled ? " is-off" : ""}">${row.cancelled ? "Снято" : "Замена"}</span>
+                </div>
+                <div class="lesson-subject">${esc(subject)}</div>
+                ${row.new_teacher ? `<div class="lesson-teacher">${esc(row.new_teacher)}</div>` : ""}
+                ${
+                    row.new_room
+                        ? `<div class="lesson-meta"><span class="chip chip-room">ауд. ${esc(row.new_room)}</span></div>`
+                        : ""
+                }
+                ${
+                    instead
+                        ? `<div class="lesson-instead">${row.cancelled ? "было" : "вместо"}: ${esc(instead)}</div>`
+                        : ""
+                }
+            </div>
+        </article>
+    `;
+}
+
+function renderChangeNotes() {
+    const current = state.substitutions || [];
+    const upcoming = state.upcoming || [];
+    if (!current.length && !upcoming.length) {
+        return "";
+    }
+    const currentHtml = current
+        .map((sheet) => {
+            const here = Number(sheet.week) === Number(state.week);
+            const action = here
+                ? `<span class="changes-here">показаны ниже</span>`
+                : `<button type="button" data-switch-week="${sheet.week}">Показать ${sheet.week}-ю неделю</button>`;
+            return `
+                <div class="changes-banner-item">
+                    <div>
+                        <b>Замена на ${esc(sheet.date_label)}</b>
+                        <span>${esc(sheet.weekday_label)}, ${sheet.week}-я неделя. Только в эту дату, потом снова обычные пары.</span>
+                    </div>
+                    <div class="changes-banner-actions">
+                        ${action}
+                        <a href="${esc(sheet.url)}">Таблица</a>
+                    </div>
+                </div>
+            `;
+        })
+        .join("");
+    const upcomingHtml = upcoming
+        .map(
+            (sheet) => `
+                <div class="changes-banner-item is-later">
+                    <div>
+                        <b>${esc(sheet.date_label)}</b>
+                        <span>${esc(sheet.weekday_label)}, ${sheet.week}-я неделя. Сейчас в сетке обычные пары — замена откроется только на той неделе.</span>
+                    </div>
+                    <div class="changes-banner-actions">
+                        <a href="${esc(sheet.url)}">Таблица</a>
+                    </div>
+                </div>
+            `,
+        )
+        .join("");
+    return `<section class="changes-banner">${currentHtml}${upcomingHtml}</section>`;
+}
+
 function renderSchedule() {
     const root = $("#schedule-root");
     if (!state.groupId) {
@@ -162,7 +299,12 @@ function renderSchedule() {
         return;
     }
 
-    if (!state.lessons.length) {
+    const banner = renderChangeNotes();
+    const hasLessons = state.lessons.length > 0;
+    const hasCurrent = (state.substitutions || []).some(
+        (sheet) => Number(sheet.week) === Number(state.week),
+    );
+    if (!hasLessons && !hasCurrent && !banner) {
         root.innerHTML = `
             <div class="empty-state">
                 <p>На эту неделю занятий нет.</p>
@@ -188,60 +330,44 @@ function renderSchedule() {
             .get(day)
             .slice()
             .sort((a, b) => Number(a.period) - Number(b.period));
-        if (!lessons.length) {
+        const covered = coveredPeriods(day);
+        const items = [];
+        lessons.forEach((lesson) => {
+            if (covered.has(Number(lesson.period))) {
+                return;
+            }
+            items.push({
+                period: Number(lesson.period),
+                html: lessonCard(day, lesson),
+            });
+        });
+        sheetsForDay(day).forEach((sheet) => {
+            (sheet.rows || []).forEach((row) => {
+                const periods = (row.periods || []).map(Number);
+                items.push({
+                    period: periods.length ? Math.min(...periods) : 99,
+                    html: changeCard(day, row),
+                });
+            });
+        });
+        if (!items.length) {
             continue;
         }
-
-        const rows = lessons
-            .map((lesson) => {
-                const teacher1 = formatTeacher(
-                    lesson.teacher_name,
-                    lesson.teacher_short,
-                );
-                const teacher2 = lesson.teacher2_name
-                    ? formatTeacher(lesson.teacher2_name, lesson.teacher2_short)
-                    : "";
-                const teacher = teacher2 ? `${teacher1} / ${teacher2}` : teacher1;
-                const rooms = [
-                    lesson.classroom_name || null,
-                    lesson.classroom2_name || null,
-                ].filter(Boolean);
-                const color = lesson.subject_color || "#a01914";
-
-                return `
-                    <article class="lesson-row">
-                        <div class="lesson-period">
-                            <b>${esc(lesson.period)}</b>
-                            <small>${esc(bellTime(day, Number(lesson.period)))}</small>
-                        </div>
-                        <div class="lesson-body" style="--lesson-color:${esc(color)}">
-                            <div class="lesson-subject">${esc(lesson.subject_name || "Предмет не назначен")}</div>
-                            <div class="lesson-teacher">${esc(teacher)}</div>
-                            ${
-                                rooms.length
-                                    ? `<div class="lesson-meta"><span class="chip chip-room">ауд. ${esc(rooms.join(" / "))}</span></div>`
-                                    : ""
-                            }
-                        </div>
-                    </article>
-                `;
-            })
-            .join("");
+        items.sort((a, b) => a.period - b.period);
 
         parts.push(`
             <section class="day-block">
                 <header class="day-head">
                     <b>${esc(DAYS[day - 1])}</b>
-                    <span>${lessons.length} ${lessons.length === 1 ? "занятие" : lessons.length < 5 ? "занятия" : "занятий"}</span>
+                    <span>${items.length} ${lessonWord(items.length)}</span>
                 </header>
-                <div class="day-lessons">${rows}</div>
+                <div class="day-lessons">${items.map((item) => item.html).join("")}</div>
             </section>
         `);
     }
 
-    root.innerHTML = parts.length
-        ? parts.join("")
-        : `<div class="empty-state"><p>На эту неделю занятий нет.</p></div>`;
+    const empty = `<div class="empty-state"><p>На эту неделю занятий нет.</p></div>`;
+    root.innerHTML = `${banner}${parts.length ? parts.join("") : empty}`;
 }
 
 async function loadSchedule() {
@@ -249,6 +375,8 @@ async function loadSchedule() {
     if (!state.groupId) {
         state.group = null;
         state.lessons = [];
+        state.substitutions = [];
+        state.upcoming = [];
         renderMeta();
         renderSchedule();
         return;
@@ -261,12 +389,16 @@ async function loadSchedule() {
         );
         state.group = data.group;
         state.lessons = data.lessons || [];
+        state.substitutions = data.substitutions || [];
+        state.upcoming = data.upcoming_substitutions || [];
         renderMeta();
         renderSchedule();
         document.title = `Расписание ${data.group.name} — НСМК`;
     } catch (error) {
         state.group = null;
         state.lessons = [];
+        state.substitutions = [];
+        state.upcoming = [];
         renderMeta();
         root.innerHTML = `<div class="error-state">${esc(error.message)}</div>`;
     }
@@ -360,6 +492,14 @@ async function init() {
 
     $("#group-select").addEventListener("change", (event) => {
         setGroup(event.target.value);
+    });
+
+    $("#schedule-root").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-switch-week]");
+        if (!button) {
+            return;
+        }
+        setWeek(Number(button.dataset.switchWeek));
     });
 
     document.querySelectorAll(".week-btn").forEach((button) => {

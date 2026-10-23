@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, abort, redirect, render_template, request, session, url_for
 
 from app.config import Config, ensure_secret_key
 from app.database import init_db
@@ -80,21 +80,40 @@ def create_app(test_config=None):
     def health():
         return {"status": "ok"}
 
+    @app.get("/admin/changes")
+    def changes_admin():
+        if session.get("role") != "admin":
+            return redirect(url_for("admin"))
+        return render_template("changes.html")
+
+    @app.get("/changes/<int:sheet_id>")
+    def changes_public(sheet_id):
+        from app.services.substitution_service import published_sheet
+
+        sheet = published_sheet(sheet_id)
+        if sheet is None:
+            abort(404)
+        return render_template("changes_public.html", sheet=sheet)
+
     from app.routes.auth import auth_bp
+    from app.routes.drafts import drafts_bp
     from app.routes.lessons import lessons_bp
     from app.routes.max_webhook import max_webhook_bp
     from app.routes.public import public_bp
     from app.routes.reference import reference_bp
     from app.routes.settings import settings_bp
     from app.routes.setup import setup_bp
+    from app.routes.substitutions import substitutions_bp
 
     app.register_blueprint(setup_bp, url_prefix="/api/setup")
     app.register_blueprint(settings_bp, url_prefix="/api/settings")
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(public_bp, url_prefix="/api/public")
     app.register_blueprint(max_webhook_bp, url_prefix="/max")
-    # lessons before reference so /api/lessons/<id> is not caught by /api/<name>/<id>
+    # Static API prefixes before reference so /api/<name>/<id> does not swallow them.
     app.register_blueprint(lessons_bp, url_prefix="/api")
+    app.register_blueprint(drafts_bp, url_prefix="/api")
+    app.register_blueprint(substitutions_bp, url_prefix="/api")
     app.register_blueprint(reference_bp, url_prefix="/api")
 
     return app

@@ -6,6 +6,8 @@ import sqlite3
 import tempfile
 import time
 import unittest
+from datetime import timedelta
+from unittest.mock import patch
 from urllib.parse import quote
 
 from werkzeug.security import generate_password_hash
@@ -515,6 +517,166 @@ class ScheduleAppTestCase(unittest.TestCase):
         self.assertEqual(match["teacher2_id"], 4)
         self.assertEqual(match["classroom2_id"], 3)
 
+    def _login_admin(self):
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin"},
+        )
+
+    def test_admin_page_has_drafts_entry(self):
+        response = self.client.get("/admin")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Черновики", html)
+        self.assertIn('data-view="drafts"', html)
+
+    def test_teacher_cannot_use_drafts(self):
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "teacher", "password": "teacher"},
+        )
+        response = self.client.get("/api/drafts")
+        self.assertEqual(response.status_code, 403)
+        response = self.client.post(
+            "/api/drafts",
+            json={"name": "Скрытый", "source": "empty"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_draft_copy_stays_off_the_live_schedule(self):
+        self._login_admin()
+        live_before = self.client.get("/api/lessons").get_json()
+        public_before = self.client.get("/api/public/schedule?group_id=1&week=1").get_json()
+
+        created = self.client.post(
+            "/api/drafts",
+            json={"name": "Следующий семестр", "source": "current"},
+        )
+        self.assertEqual(created.status_code, 201)
+        draft = created.get_json()
+        self.assertEqual(draft["lesson_count"], len(live_before))
+
+        draft_lessons = self.client.get(f"/api/drafts/{draft['id']}/lessons").get_json()
+        self.assertEqual(len(draft_lessons), len(live_before))
+        sample = draft_lessons[0]
+        updated = self.client.put(
+            f"/api/drafts/{draft['id']}/lessons/{sample['id']}",
+            json={
+                "week": sample["week"],
+                "weekday": sample["weekday"],
+                "period": sample["period"],
+                "group_id": sample["group_id"],
+                "teacher_id": sample["teacher_id"],
+                "subject_id": sample["subject_id"],
+                "classroom_id": sample["classroom_id"],
+                "lesson_type": sample["lesson_type"],
+                "note": "только черновик",
+            },
+        )
+        self.assertEqual(updated.status_code, 200)
+
+        live_after = self.client.get("/api/lessons").get_json()
+        self.assertEqual(len(live_after), len(live_before))
+        self.assertFalse(any(item["note"] == "только черновик" for item in live_after))
+        public_after = self.client.get("/api/public/schedule?group_id=1&week=1").get_json()
+        self.assertEqual(public_after["lessons"], public_before["lessons"])
+
+    def test_draft_conflicts_do_not_see_the_live_board(self):
+        self._login_admin()
+        created = self.client.post(
+            "/api/drafts",
+            json={"name": "Пустой", "source": "empty"},
+        )
+        self.assertEqual(created.status_code, 201)
+        draft_id = created.get_json()["id"]
+        payload = {
+            "week": 1,
+            "weekday": 1,
+            "period": 1,
+            "group_id": 1,
+            "teacher_id": 1,
+            "subject_id": 1,
+            "classroom_id": 1,
+            "lesson_type": "Лекция",
+        }
+        first = self.client.post(f"/api/drafts/{draft_id}/lessons", json=payload)
+        self.assertEqual(first.status_code, 201)
+        second = self.client.post(f"/api/drafts/{draft_id}/lessons", json=payload)
+        self.assertEqual(second.status_code, 409)
+        self.assertIn("Конфликт", second.get_json()["error"])
+
+        live = self.client.get("/api/lessons?week=1").get_json()
+        self.assertEqual(
+            sum(1 for item in live if item["group_id"] == 1 and item["period"] == 1 and item["weekday"] == 1),
+            1,
+        )
+
+    def test_publish_replaces_live_schedule_and_keeps_the_draft(self):
+        self._login_admin()
+        created = self.client.post(
+            "/api/drafts",
+            json={"name": "Замена", "source": "empty"},
+        )
+        draft_id = created.get_json()["id"]
+        self.client.post(
+            f"/api/drafts/{draft_id}/lessons",
+            json={
+                "week": 2,
+                "weekday": 3,
+                "period": 2,
+                "group_id": 2,
+                "teacher_id": 3,
+                "subject_id": 3,
+                "lesson_type": "Практика",
+                "note": "из черновика",
+            },
+        )
+        published = self.client.post(f"/api/drafts/{draft_id}/publish")
+        self.assertEqual(published.status_code, 200)
+        self.assertEqual(published.get_json()["lessons"], 1)
+
+        live = self.client.get("/api/lessons").get_json()
+        self.assertEqual(len(live), 1)
+        self.assertEqual(live[0]["note"], "из черновика")
+        self.assertEqual(live[0]["group_id"], 2)
+
+        public = self.client.get("/api/public/schedule?group_id=2&week=2").get_json()
+        self.assertEqual(len(public["lessons"]), 1)
+        self.assertEqual(public["lessons"][0]["note"], "из черновика")
+        untouched = self.client.get("/api/public/schedule?group_id=1&week=1").get_json()
+        self.assertEqual(untouched["lessons"], [])
+
+        drafts = self.client.get("/api/drafts").get_json()
+        self.assertEqual(len(drafts), 1)
+        self.assertEqual(drafts[0]["lesson_count"], 1)
+
+    def test_delete_draft_keeps_live_schedule(self):
+        self._login_admin()
+        before = len(self.client.get("/api/lessons").get_json())
+        created = self.client.post(
+            "/api/drafts",
+            json={"name": "Временный", "source": "current"},
+        )
+        draft_id = created.get_json()["id"]
+        removed = self.client.delete(f"/api/drafts/{draft_id}")
+        self.assertEqual(removed.status_code, 200)
+        self.assertEqual(self.client.get("/api/drafts").get_json(), [])
+        self.assertEqual(len(self.client.get("/api/lessons").get_json()), before)
+
+    def test_rename_draft(self):
+        self._login_admin()
+        created = self.client.post(
+            "/api/drafts",
+            json={"name": "Старое", "source": "empty"},
+        )
+        draft_id = created.get_json()["id"]
+        renamed = self.client.put(
+            f"/api/drafts/{draft_id}",
+            json={"name": "Новое имя"},
+        )
+        self.assertEqual(renamed.status_code, 200)
+        self.assertEqual(renamed.get_json()["name"], "Новое имя")
+
 
 def _sign_init_data(token, pairs):
     launch = "\n".join(f"{key}={value}" for key, value in sorted(pairs))
@@ -906,6 +1068,211 @@ class SetupTestCase(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(directory, "secret_key")))
         finally:
             shutil.rmtree(directory, ignore_errors=True)
+
+
+class SubstitutionTestCase(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.db_fd)
+        os.remove(self.db_path)
+        self.app = create_app(
+            {
+                "TESTING": True,
+                "DATABASE": self.db_path,
+                "SEED_DEMO_DATA": True,
+                "SECRET_KEY": "test-secret",
+                "MAX_BOT_TOKEN": "",
+            }
+        )
+        _insert_user(self.db_path, "admin", "admin", "admin")
+        _insert_user(self.db_path, "teacher", "teacher", "teacher")
+        self.client = self.app.test_client()
+
+    def tearDown(self):
+        _cleanup_db(self.db_path)
+
+    def _login_admin(self):
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin"},
+        )
+
+    def _dates(self):
+        from app.services.substitution_service import _school_span, school_today
+
+        today = school_today()
+        span = _school_span(today)
+        if span is None:
+            upcoming = today + timedelta(days=5)
+            past = today - timedelta(days=3)
+            return None, upcoming, past
+        this_day = span[0] + timedelta(days=4)
+        return this_day, this_day + timedelta(days=7), this_day - timedelta(days=7)
+
+    def _row(self, subject="литература"):
+        return {
+            "group_id": 1,
+            "periods": "1,2",
+            "new_subject": subject,
+            "new_room": "407",
+            "new_teacher": "МемишеваГП",
+            "old_subject": "биология",
+            "absent_teacher": "БабушкинаТП",
+        }
+
+    def _create(self, day, subject="литература"):
+        response = self.client.post(
+            "/api/substitutions",
+            json={"sheet_date": day.isoformat(), "week": 2, "rows": [self._row(subject)]},
+        )
+        self.assertEqual(response.status_code, 201, response.get_json())
+        return response.get_json()
+
+    def test_draft_is_hidden_and_publish_is_only_for_this_school_week(self):
+        self._login_admin()
+        this_day, next_day, past_day = self._dates()
+        before = self.client.get("/api/public/schedule?group_id=1&week=2").get_json()
+
+        if this_day is not None:
+            draft = self._create(this_day, "черновик")
+            hidden = self.client.get(f"/changes/{draft['id']}")
+            self.assertEqual(hidden.status_code, 404)
+            still = self.client.get("/api/public/schedule?group_id=1&week=2").get_json()
+            self.assertEqual(still["lessons"], before["lessons"])
+            self.assertEqual(still["substitutions"], [])
+
+            published = self.client.post(f"/api/substitutions/{draft['id']}/publish")
+            self.assertEqual(published.status_code, 200, published.get_json())
+            self.assertFalse(published.get_json()["notify"]["sent"])
+
+            locked = self.client.put(
+                f"/api/substitutions/{draft['id']}",
+                json={"sheet_date": this_day.isoformat(), "week": 2, "rows": [self._row()]},
+            )
+            self.assertEqual(locked.status_code, 400)
+
+        upcoming = self._create(next_day, "потом")
+        self.client.post(f"/api/substitutions/{upcoming['id']}/publish")
+        old = self._create(past_day, "прошло")
+        self.client.post(f"/api/substitutions/{old['id']}/publish")
+
+        view = self.client.get("/api/public/schedule?group_id=1&week=2").get_json()
+        self.assertEqual(view["lessons"], before["lessons"])
+        current_dates = [item["sheet_date"] for item in view["substitutions"]]
+        later_dates = [item["sheet_date"] for item in view["upcoming_substitutions"]]
+        self.assertNotIn(past_day.isoformat(), current_dates + later_dates)
+        self.assertIn(next_day.isoformat(), later_dates)
+        self.assertNotIn(next_day.isoformat(), current_dates)
+        if this_day is not None:
+            self.assertIn(this_day.isoformat(), current_dates)
+            self.assertTrue(view["substitutions"][0]["applies"])
+            page = self.client.get(f"/changes/{view['substitutions'][0]['id']}")
+            self.assertEqual(page.status_code, 200)
+            html = page.get_data(as_text=True)
+            self.assertIn("черновик (ауд.407)", html)
+            self.assertIn("МемишеваГП", html)
+            self.assertIn("обычное расписание", html)
+        else:
+            self.assertEqual(current_dates, [])
+
+        other = self.client.get("/api/public/schedule?group_id=2&week=2").get_json()
+        self.assertEqual(other["substitutions"], [])
+        self.assertEqual(other["upcoming_substitutions"], [])
+
+    def test_teacher_cannot_edit_substitutions(self):
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "teacher", "password": "teacher"},
+        )
+        response = self.client.post(
+            "/api/substitutions",
+            json={"sheet_date": "2026-10-23", "week": 2, "rows": []},
+        )
+        self.assertEqual(response.status_code, 403)
+        page = self.client.get("/admin/changes")
+        self.assertEqual(page.status_code, 302)
+
+    def test_notice_uses_link_and_stays_within_max_limit(self):
+        from app.services.max_bot import build_chat_id_reply
+        from app.services.substitution_service import build_notice_messages
+
+        rows = [
+            {
+                "group_name": f"группа-{index}",
+                "periods": [1, 2],
+                "periods_label": "1,2",
+                "new_subject_label": "очень длинный предмет " * 8,
+                "new_teacher": "МемишеваГП",
+                "old_subject": "биология",
+                "absent_teacher": "БабушкинаТП",
+                "cancelled": False,
+            }
+            for index in range(30)
+        ]
+        messages, attachments = build_notice_messages(
+            {
+                "id": 7,
+                "date_label": "23.10.2026",
+                "week": 2,
+                "weekday_label": "пятница",
+                "rows": rows,
+            },
+            "https://nsmk.example",
+        )
+        self.assertGreater(len(messages), 1)
+        for text in messages:
+            self.assertLessEqual(len(text), 4000)
+        self.assertIn("[Открыть таблицу](https://nsmk.example/changes/7)", messages[0])
+        button = attachments[0]["payload"]["buttons"][0][0]
+        self.assertEqual(button["type"], "link")
+        self.assertEqual(button["url"], "https://nsmk.example/changes/7")
+
+        reply = build_chat_id_reply(
+            {
+                "update_type": "message_created",
+                "message": {
+                    "sender": {"user_id": 5, "is_bot": False},
+                    "body": {"text": "/chatid"},
+                    "recipient": {"chat_id": 99, "user_id": 5},
+                },
+            }
+        )
+        self.assertIn("99", reply["text"])
+
+    def test_publish_sends_max_message_to_saved_chat(self):
+        self._login_admin()
+        _, next_day, _ = self._dates()
+        sheet = self._create(next_day)
+        saved = self.client.put(
+            "/api/substitutions/notify-chat",
+            json={"chat_id": "4242"},
+        )
+        self.assertEqual(saved.status_code, 200, saved.get_json())
+        connection = sqlite3.connect(self.db_path)
+        connection.execute(
+            "INSERT INTO app_settings (key, value) VALUES ('public_url', 'https://nsmk.example')"
+        )
+        connection.commit()
+        connection.close()
+        self.app.config["MAX_BOT_TOKEN"] = "test-token"
+        sent = []
+
+        class FakeClient:
+            def __init__(self, token, base_url):
+                self.token = token
+
+            def send_message(self, **kwargs):
+                sent.append(kwargs)
+                return {}
+
+        with patch("app.services.substitution_service.MaxClient", FakeClient):
+            response = self.client.post(f"/api/substitutions/{sheet['id']}/publish")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertTrue(response.get_json()["notify"]["sent"])
+        self.assertEqual(sent[0]["chat_id"], 4242)
+        self.assertEqual(sent[0]["text_format"], "markdown")
+        self.assertIn("литература", sent[0]["text"])
+        self.assertIn("https://nsmk.example/changes/", sent[0]["text"])
 
 
 if __name__ == "__main__":

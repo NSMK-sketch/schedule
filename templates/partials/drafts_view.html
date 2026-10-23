@@ -1,0 +1,37 @@
+<section id="drafts-view" class="content-section hidden">
+    <div class="glpi-header">
+        <div class="glpi-breadcrumb">
+            <span>Расписание</span>
+            <span class="glpi-sep">›</span>
+            <strong>Черновики</strong>
+        </div>
+        <div class="glpi-header-main">
+            <div>
+                <h2>Черновики</h2>
+                <p>Готовьте следующее расписание, пока студенты видят текущее. Черновиков может быть несколько.</p>
+            </div>
+            <div class="glpi-header-actions">
+                <button id="draft-add-button" class="button button-primary" type="button">
+                    + Новый черновик
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="glpi-table-wrap drafts-table-wrap">
+        <table class="glpi-table" id="drafts-table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Занятий</th>
+                    <th>Изменён</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="drafts-tbody"></tbody>
+        </table>
+        <div id="drafts-empty" class="glpi-empty hidden">
+            Черновиков пока нет. Создайте копию текущего расписания или пустой черновик.
+        </div>
+    </div>
+</section>

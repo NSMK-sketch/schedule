@@ -1,0 +1,36 @@
+<dialog id="draft-dialog" class="dialog dialog-form">
+    <form id="draft-form" class="dialog-card">
+        <header class="dialog-header">
+            <div>
+                <div class="eyebrow">Черновик</div>
+                <h2 id="draft-dialog-title">Новый черновик</h2>
+            </div>
+            <button type="button" class="icon-button" data-close>×</button>
+        </header>
+
+        <input id="draft-id" type="hidden">
+        <div id="draft-error" class="dialog-error hidden" role="alert" aria-live="assertive"></div>
+
+        <label class="glpi-field">
+            <span>Название <em>*</em></span>
+            <input id="draft-name" required maxlength="80" placeholder="Например, следующий семестр">
+        </label>
+
+        <fieldset id="draft-source-field" class="draft-source-field">
+            <legend>Откуда взять занятия</legend>
+            <label class="draft-source-option">
+                <input type="radio" name="draft-source" value="current" checked>
+                <span>Копия текущего расписания</span>
+            </label>
+            <label class="draft-source-option">
+                <input type="radio" name="draft-source" value="empty">
+                <span>Пустой черновик</span>
+            </label>
+        </fieldset>
+
+        <footer class="dialog-actions">
+            <button type="button" class="button button-secondary" data-close>Отмена</button>
+            <button id="draft-submit" class="button button-primary" type="submit">Создать</button>
+        </footer>
+    </form>
+</dialog>

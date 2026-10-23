@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, jsonify, request
 from app.database import get_db
 from app.services.lesson_service import list_lessons
 from app.services.max_init_data import validate_init_data
+from app.services.substitution_service import substitutions_for_group
 
 
 public_bp = Blueprint("public", __name__)
@@ -77,11 +78,14 @@ def public_schedule():
         return jsonify({"error": "Группа не найдена."}), 404
 
     lessons = list_lessons(week=week, group_id=group_id)
+    changes = substitutions_for_group(group["id"], group["name"])
     return jsonify(
         {
             "group": _serialize_group(group),
             "week": week,
             "lessons": [_serialize_public_lesson(item) for item in lessons],
+            "substitutions": changes["current"],
+            "upcoming_substitutions": changes["upcoming"],
         }
     )
 

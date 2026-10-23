@@ -83,6 +83,74 @@ CREATE INDEX IF NOT EXISTS idx_lessons_group
     ON lessons (group_id, week, weekday, period);
 CREATE INDEX IF NOT EXISTS idx_lessons_classroom
     ON lessons (classroom_id, week, weekday, period);
+
+CREATE TABLE IF NOT EXISTS schedule_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS draft_lessons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    draft_id INTEGER NOT NULL,
+    group_id INTEGER NOT NULL,
+    teacher_id INTEGER NOT NULL,
+    teacher2_id INTEGER,
+    subject_id INTEGER,
+    classroom_id INTEGER,
+    classroom2_id INTEGER,
+    weekday INTEGER NOT NULL,
+    period INTEGER NOT NULL,
+    week INTEGER NOT NULL DEFAULT 1,
+    lesson_type TEXT NOT NULL DEFAULT 'Лекция',
+    note TEXT DEFAULT '',
+    FOREIGN KEY (draft_id) REFERENCES schedule_drafts(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES groups_ref(id),
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id),
+    FOREIGN KEY (teacher2_id) REFERENCES teachers(id),
+    FOREIGN KEY (subject_id) REFERENCES subjects(id),
+    FOREIGN KEY (classroom_id) REFERENCES classrooms(id),
+    FOREIGN KEY (classroom2_id) REFERENCES classrooms(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_draft_lessons_draft
+    ON draft_lessons (draft_id, week, weekday, period);
+CREATE INDEX IF NOT EXISTS idx_draft_lessons_group
+    ON draft_lessons (group_id, draft_id);
+
+CREATE TABLE IF NOT EXISTS substitution_sheets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sheet_date TEXT NOT NULL,
+    week INTEGER NOT NULL,
+    weekday INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    published_at TEXT,
+    last_notify_at TEXT,
+    last_notify_error TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS substitution_rows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sheet_id INTEGER NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    group_id INTEGER,
+    group_name TEXT NOT NULL,
+    periods TEXT NOT NULL,
+    new_subject TEXT NOT NULL DEFAULT '',
+    new_room TEXT NOT NULL DEFAULT '',
+    new_teacher TEXT NOT NULL DEFAULT '',
+    old_subject TEXT NOT NULL DEFAULT '',
+    absent_teacher TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (sheet_id) REFERENCES substitution_sheets(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_substitution_sheets_date
+    ON substitution_sheets (status, sheet_date);
+CREATE INDEX IF NOT EXISTS idx_substitution_rows_sheet
+    ON substitution_rows (sheet_id, sort_order);
 """
 # teacher2/classroom2 indexes are created in _migrate_schema after columns exist
 

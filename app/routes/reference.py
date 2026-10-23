@@ -497,10 +497,16 @@ def delete_reference(name, item_id):
         removed_lessons = 0
 
         if name == "groups":
+            db.execute(
+                "DELETE FROM draft_lessons WHERE group_id = ?", (item_id,)
+            )
             removed_lessons = db.execute(
                 "DELETE FROM lessons WHERE group_id = ?", (item_id,)
             ).rowcount
         elif name == "teachers":
+            db.execute(
+                "DELETE FROM draft_lessons WHERE teacher_id = ?", (item_id,)
+            )
             removed_lessons = db.execute(
                 "DELETE FROM lessons WHERE teacher_id = ?", (item_id,)
             ).rowcount
@@ -514,9 +520,20 @@ def delete_reference(name, item_id):
                 (item_id,),
             )
             db.execute(
+                """
+                UPDATE draft_lessons
+                SET teacher2_id = NULL, classroom2_id = NULL
+                WHERE teacher2_id = ?
+                """,
+                (item_id,),
+            )
+            db.execute(
                 "DELETE FROM teacher_subjects WHERE teacher_id = ?", (item_id,)
             )
         elif name == "subjects":
+            db.execute(
+                "DELETE FROM draft_lessons WHERE subject_id = ?", (item_id,)
+            )
             removed_lessons = db.execute(
                 "DELETE FROM lessons WHERE subject_id = ?", (item_id,)
             ).rowcount
@@ -531,6 +548,14 @@ def delete_reference(name, item_id):
             )
             db.execute(
                 "UPDATE lessons SET classroom2_id = NULL WHERE classroom2_id = ?",
+                (item_id,),
+            )
+            db.execute(
+                "UPDATE draft_lessons SET classroom_id = NULL WHERE classroom_id = ?",
+                (item_id,),
+            )
+            db.execute(
+                "UPDATE draft_lessons SET classroom2_id = NULL WHERE classroom2_id = ?",
                 (item_id,),
             )
 

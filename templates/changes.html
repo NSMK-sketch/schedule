@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Замены — НСМК</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='changes.css') }}?v=2">
+</head>
+<body>
+    <header class="top">
+        <a class="back" href="/admin">← Расписание</a>
+        <div class="top-title">
+            <strong>Замены</strong>
+            <span>Лист можно править, пока он не опубликован. После публикации он виден только в свою дату.</span>
+        </div>
+        <form id="chat-form" class="chat-form">
+            <label>
+                Чат MAX
+                <input id="chat-id" inputmode="numeric" autocomplete="off" placeholder="ID из /chatid">
+            </label>
+            <button type="submit">Сохранить</button>
+        </form>
+    </header>
+
+    <p id="notice" class="notice hidden" role="status"></p>
+
+    <div class="layout">
+        <aside class="list-pane">
+            <button id="new-sheet" class="primary" type="button">+ Новая замена</button>
+            <div id="sheet-list" class="sheet-list"></div>
+        </aside>
+        <main id="editor" class="editor"></main>
+    </div>
+
+    <datalist id="subject-options"></datalist>
+    <datalist id="teacher-options"></datalist>
+    <script src="{{ url_for('static', filename='changes.js') }}?v=2"></script>
+</body>
+</html>

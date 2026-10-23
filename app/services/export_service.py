@@ -250,6 +250,7 @@ def export_schedule_xlsx(
     teacher_id: int | None = None,
     subject_id: int | None = None,
     query: str = "",
+    draft_id: int | None = None,
 ) -> tuple[bytes, str]:
     """Return (xlsx_bytes, filename) for filtered schedule."""
     groups = _list_groups(group_ids)
@@ -257,7 +258,7 @@ def export_schedule_xlsx(
         raise ValueError("Нет групп для экспорта по выбранным фильтрам.")
 
     slot_filters = teacher_id is not None or subject_id is not None or bool(query)
-    lessons = list_lessons()
+    lessons = list_lessons(draft_id=draft_id)
     allowed = {int(group["id"]) for group in groups}
     lessons = [
         lesson
@@ -319,6 +320,8 @@ def export_schedule_xlsx(
         filename = f"расписание_{len(groups)}_групп.xlsx"
     else:
         filename = "расписание_все_группы.xlsx"
+    if draft_id is not None:
+        filename = f"черновик_{filename}"
 
     filename = (
         filename.replace("/", "-")

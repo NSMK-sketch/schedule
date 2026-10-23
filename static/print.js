@@ -58,12 +58,24 @@ function getPrintFilters() {
     const teacherId = params.get("teacher_id");
     const subjectId = params.get("subject_id");
     const query = (params.get("q") || "").trim();
+    const draftId = params.get("draft_id");
+    const draftName = (params.get("draft_name") || "").trim();
     return {
         teacherId: teacherId || "",
         subjectId: subjectId || "",
         query,
+        draftId: draftId || "",
+        draftName,
         active: Boolean(teacherId || subjectId || query),
     };
+}
+
+function lessonsApiUrl(query) {
+    const filters = getPrintFilters();
+    const base = filters.draftId
+        ? `/api/drafts/${encodeURIComponent(filters.draftId)}/lessons`
+        : "/api/lessons";
+    return query ? `${base}?${query}` : base;
 }
 
 function lessonCellHtml(lesson, { compactEmpty = false } = {}) {
@@ -338,6 +350,12 @@ function buildFilterMeta(filters, bootstrap, groups) {
         tags.push(`Поиск: ${filters.query}`);
     }
 
+    if (filters.draftName) {
+        tags.unshift(`Черновик: ${filters.draftName}`);
+    } else if (filters.draftId) {
+        tags.unshift("Черновик");
+    }
+
     tags.push("1-я и 2-я недели");
     return tags;
 }
@@ -353,7 +371,7 @@ async function init() {
         const groupIds = parseGroupIdsFromQuery();
         const [bootstrap, allLessons] = await Promise.all([
             api("/api/bootstrap"),
-            api("/api/lessons"),
+            api(lessonsApiUrl()),
         ]);
 
         let lessons = filterLessonsByQuery(allLessons, filters);
@@ -397,7 +415,7 @@ async function init() {
 
     const [bootstrap, rawLessons] = await Promise.all([
         api("/api/bootstrap"),
-        api(`/api/lessons?group_id=${groupId}`),
+        api(lessonsApiUrl(`group_id=${groupId}`)),
     ]);
 
     const lessons = filterLessonsByQuery(rawLessons, filters);

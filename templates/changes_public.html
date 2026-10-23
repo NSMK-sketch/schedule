@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ sheet.title }} — НСМК</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='changes.css') }}?v=2">
+</head>
+<body class="public-body">
+    <header class="public-bar">
+        <a href="/">Расписание</a>
+        <button type="button" onclick="window.print()">Печать</button>
+    </header>
+    <div class="sheet-scroll">
+        <table class="paper">
+            <thead>
+                <tr>
+                    <th class="paper-title" colspan="6">{{ sheet.title }}</th>
+                </tr>
+                <tr>
+                    <th class="col-group">Группа</th>
+                    <th class="col-period">пара</th>
+                    <th colspan="2">{{ sheet.date_label }}</th>
+                    <th colspan="2">Заменяемый предмет;<br>Отсутствующий преподаватель</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in sheet.rows %}
+                <tr>
+                    <td>{{ row.group_name }}</td>
+                    <td class="center">{{ row.periods_label }}</td>
+                    <td>
+                        {% if row.cancelled %}снято{% else %}{{ row.new_subject_label }}{% endif %}
+                    </td>
+                    <td>{{ row.new_teacher }}</td>
+                    <td>{{ row.old_subject }}</td>
+                    <td>{{ row.absent_teacher }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="center">Строк нет.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="paper-note">
+        Замена только на {{ sheet.date_label }}.
+        На следующей неделе в этот день снова обычное расписание.
+    </p>
+</body>
+</html>

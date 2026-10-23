@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, session, send_file
 from io import BytesIO
 
+from app.services.draft_service import get_draft
 from app.services.export_service import export_schedule_xlsx
 from app.services.lesson_service import (
     copy_week,
@@ -66,6 +67,13 @@ def export_schedule():
     teacher_id = request.args.get("teacher_id", type=int)
     subject_id = request.args.get("subject_id", type=int)
     query = (request.args.get("q") or "").strip()
+    draft_id = request.args.get("draft_id", type=int)
+    if draft_id is not None:
+        admin_error = require_admin()
+        if admin_error:
+            return admin_error
+        if get_draft(draft_id) is None:
+            return jsonify({"error": "Черновик не найден."}), 404
 
     try:
         payload, filename = export_schedule_xlsx(
@@ -73,6 +81,7 @@ def export_schedule():
             teacher_id=teacher_id,
             subject_id=subject_id,
             query=query,
+            draft_id=draft_id,
         )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400

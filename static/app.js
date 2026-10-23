@@ -15,6 +15,9 @@ const state = {
     classrooms: [],
     teacher_subjects: [],
     lessons: [],
+    drafts: [],
+    draftId: null,
+    draftName: "",
     expandedTeachers: new Set(),
 };
 
@@ -256,8 +259,7 @@ async function forcePlaceDespiteConflict() {
             state.week = action.week;
             updateWeekButtons();
         }
-        await loadLessons();
-        render();
+        await reloadBoard();
     } catch (error) {
         toast(error.message, "error");
     }
@@ -413,17 +415,50 @@ function setDirectoriesOpen(open) {
     }
 }
 
+function lessonsCollectionUrl() {
+    if (state.draftId) {
+        return `/api/drafts/${state.draftId}/lessons`;
+    }
+    return "/api/lessons";
+}
+
 async function loadData() {
     const data = await api("/api/bootstrap");
+    const draftId = state.draftId;
+    const draftName = state.draftName;
     Object.assign(state, data);
+    state.draftId = draftId;
+    state.draftName = draftName;
 
-    await loadLessons();
+    await Promise.all([loadLessons(), loadDrafts()]);
     render();
 }
 
+async function loadDrafts() {
+    if (!isAdmin()) {
+        state.drafts = [];
+        return;
+    }
+    state.drafts = await api("/api/drafts");
+    if (state.draftId) {
+        const current = state.drafts.find((item) => Number(item.id) === Number(state.draftId));
+        if (current) {
+            state.draftName = current.name;
+        }
+    }
+}
+
 async function loadLessons() {
-    const params = new URLSearchParams({ week: state.week });
-    state.lessons = await api(`/api/lessons?${params}`);
+    const params = new URLSearchParams({ week: String(state.week) });
+    state.lessons = await api(`${lessonsCollectionUrl()}?${params}`);
+}
+
+async function reloadBoard() {
+    await loadLessons();
+    if (state.draftId) {
+        await loadDrafts();
+    }
+    render();
 }
 
 function groupsMatchingCourses() {
@@ -548,6 +583,9 @@ function render() {
     renderTeachersPanel();
     renderDirectoryCounts();
     renderDirectoryTable();
+    renderDraftTabs();
+    renderDraftBanner();
+    renderDrafts();
 
     const groupsOnScreen = visibleGroups();
     const groupIds = new Set(groupsOnScreen.map((group) => Number(group.id)));
@@ -568,7 +606,7 @@ function renderDirectoryCounts() {
 }
 
 function switchView(view, directory = null) {
-    if (view === "directory" && !isAdmin()) {
+    if ((view === "directory" || view === "drafts") && !isAdmin()) {
         return;
     }
 
@@ -583,16 +621,21 @@ function switchView(view, directory = null) {
     }
 
     document.querySelectorAll("[data-view]").forEach((item) => {
-        const isSchedule = item.dataset.view === "schedule" && view === "schedule";
+        const editingDraft = view === "schedule" && state.draftId;
+        const isSchedule = item.dataset.view === "schedule" && view === "schedule" && !editingDraft;
+        const isDrafts =
+            item.dataset.view === "drafts" &&
+            (view === "drafts" || editingDraft);
         const isDirectory =
             item.dataset.view === "directory" &&
             view === "directory" &&
             item.dataset.directory === state.directory;
-        item.classList.toggle("active", Boolean(isSchedule || isDirectory));
+        item.classList.toggle("active", Boolean(isSchedule || isDirectory || isDrafts));
     });
 
     $("#schedule-view").classList.toggle("hidden", view !== "schedule");
     $("#directories-view").classList.toggle("hidden", view !== "directory");
+    $("#drafts-view")?.classList.toggle("hidden", view !== "drafts");
 
     const tools = $("#side-schedule-tools");
     if (tools) {
@@ -602,6 +645,9 @@ function switchView(view, directory = null) {
     if (view === "directory") {
         setDirectoriesOpen(true);
         renderDirectoryTable();
+    }
+    if (view === "drafts") {
+        renderDrafts();
     }
 }
 
@@ -1023,7 +1069,7 @@ function createScheduleCell(weekday, period, groupId) {
 
 async function placeTeacherWithoutSubject(teacherId, weekday, period, groupId) {
     try {
-        await api("/api/lessons", {
+        await api(lessonsCollectionUrl(), {
             method: "POST",
             body: JSON.stringify({
                 week: state.week,
@@ -1038,8 +1084,7 @@ async function placeTeacherWithoutSubject(teacherId, weekday, period, groupId) {
             }),
         });
         toast("Преподаватель добавлен. Укажите предмет.");
-        await loadLessons();
-        render();
+        await reloadBoard();
     } catch (error) {
         toast(error.message, "error");
     }
@@ -1095,10 +1140,9 @@ function createCard(lesson) {
             }
 
             try {
-                await api(`/api/lessons/${lesson.id}`, { method: "DELETE" });
+                await api(`${lessonsCollectionUrl()}/${lesson.id}`, { method: "DELETE" });
                 toast("Занятие удалено.");
-                await loadLessons();
-                render();
+                await reloadBoard();
             } catch (error) {
                 toast(error.message, "error");
             }
@@ -1125,18 +1169,17 @@ async function moveLesson(id, weekday, period, groupId) {
     });
 
     try {
-        await api(`/api/lessons/${id}`, {
+        await api(`${lessonsCollectionUrl()}/${id}`, {
             method: "PUT",
             body: JSON.stringify(data),
         });
 
         toast("Занятие перемещено.");
-        await loadLessons();
-        render();
+        await reloadBoard();
     } catch (error) {
         if (String(error.message).startsWith("Конфликт:")) {
             showConflictDialog(error.message, {
-                url: `/api/lessons/${id}`,
+                url: `${lessonsCollectionUrl()}/${id}`,
                 method: "PUT",
                 data,
                 successMessage: "Занятие размещено несмотря на конфликт.",
@@ -1465,7 +1508,7 @@ async function saveLesson(event) {
         return;
     }
 
-    const url = id ? `/api/lessons/${id}` : "/api/lessons";
+    const url = id ? `${lessonsCollectionUrl()}/${id}` : lessonsCollectionUrl();
     const method = id ? "PUT" : "POST";
 
     try {
@@ -1478,8 +1521,7 @@ async function saveLesson(event) {
         toast(id ? "Занятие обновлено." : "Занятие добавлено.");
         state.week = data.week;
         updateWeekButtons();
-        await loadLessons();
-        render();
+        await reloadBoard();
     } catch (error) {
         if (String(error.message).startsWith("Конфликт:")) {
             showConflictDialog(error.message, {
@@ -1510,11 +1552,10 @@ async function deleteCurrentLesson() {
     }
 
     try {
-        await api(`/api/lessons/${id}`, { method: "DELETE" });
+        await api(`${lessonsCollectionUrl()}/${id}`, { method: "DELETE" });
         $("#lesson-dialog").close();
         toast("Занятие удалено.");
-        await loadLessons();
-        render();
+        await reloadBoard();
     } catch (error) {
         toast(error.message, "error");
     }
@@ -2158,6 +2199,12 @@ function scheduleFilterQuery() {
     if (state.search.trim()) {
         params.set("q", state.search.trim());
     }
+    if (state.draftId) {
+        params.set("draft_id", String(state.draftId));
+        if (state.draftName) {
+            params.set("draft_name", state.draftName);
+        }
+    }
     return params;
 }
 
@@ -2206,7 +2253,7 @@ async function copyWeek(event) {
     }
 
     try {
-        const result = await api("/api/lessons/copy-week", {
+        const result = await api(`${lessonsCollectionUrl()}/copy-week`, {
             method: "POST",
             body: JSON.stringify({
                 source_week: sourceWeek,
@@ -2224,8 +2271,7 @@ async function copyWeek(event) {
 
         state.week = targetWeek;
         updateWeekButtons();
-        await loadLessons();
-        render();
+        await reloadBoard();
     } catch (error) {
         toast(error.message, "error");
     }
@@ -2240,6 +2286,275 @@ function updateWeekButtons() {
     });
 
     $("#current-week-label").textContent = `${state.week}-я неделя`;
+}
+
+function formatDraftDate(value) {
+    const match = String(value || "").match(
+        /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/,
+    );
+    if (!match) {
+        return value || "—";
+    }
+    const date = new Date(Date.UTC(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        Number(match[4]),
+        Number(match[5]),
+    ));
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+    return date.toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+function renderDraftTabs() {
+    const bar = $("#schedule-draft-tabs");
+    if (!bar) {
+        return;
+    }
+
+    const show = isAdmin() && state.view === "schedule";
+    bar.classList.toggle("hidden", !show);
+    if (!show) {
+        return;
+    }
+
+    bar.replaceChildren();
+    bar.append(draftTab("Текущее", !state.draftId, showLiveSchedule));
+    state.drafts.forEach((draft) => {
+        const active = Number(state.draftId) === Number(draft.id);
+        bar.append(draftTab(draft.name, active, () => openDraft(draft)));
+    });
+    const add = draftTab("+ Черновик", false, () => openDraftDialog());
+    add.classList.add("draft-tab-add");
+    bar.append(add);
+}
+
+function draftTab(label, active, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `draft-tab${active ? " active" : ""}`;
+    button.textContent = label;
+    button.title = label;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", active ? "true" : "false");
+    button.addEventListener("click", async () => {
+        try {
+            await onClick();
+        } catch (error) {
+            toast(error.message, "error");
+        }
+    });
+    return button;
+}
+
+function renderDraftBanner() {
+    const banner = $("#draft-banner");
+    if (!banner) {
+        return;
+    }
+    const active = Boolean(state.draftId) && state.view === "schedule";
+    banner.classList.toggle("hidden", !active);
+    if (!active) {
+        return;
+    }
+    const title = $("#draft-banner-title");
+    if (title) {
+        title.textContent = `Черновик «${state.draftName || "без названия"}»`;
+    }
+}
+
+function renderDrafts() {
+    const body = $("#drafts-tbody");
+    const empty = $("#drafts-empty");
+    if (!body || !empty) {
+        return;
+    }
+
+    body.replaceChildren();
+    const drafts = state.drafts || [];
+    empty.classList.toggle("hidden", drafts.length > 0);
+
+    drafts.forEach((draft) => {
+        const row = document.createElement("tr");
+        row.className = "glpi-row";
+        row.innerHTML = `
+            <td><button type="button" class="draft-name">${esc(draft.name)}</button></td>
+            <td>${Number(draft.lesson_count) || 0}</td>
+            <td>${esc(formatDraftDate(draft.updated_at))}</td>
+            <td class="glpi-col-actions">
+                <div class="glpi-row-actions">
+                    <button type="button" class="glpi-action" data-draft-action="open">Открыть</button>
+                    <button type="button" class="glpi-action" data-draft-action="rename">Переименовать</button>
+                    <button type="button" class="glpi-action" data-draft-action="publish">Заменить текущее</button>
+                    <button type="button" class="glpi-action glpi-action-danger" data-draft-action="delete">Удалить</button>
+                </div>
+            </td>
+        `;
+        row.querySelector(".draft-name").addEventListener("click", () => {
+            openDraft(draft).catch((error) => toast(error.message, "error"));
+        });
+        row.querySelectorAll("[data-draft-action]").forEach((button) => {
+            button.addEventListener("click", () => {
+                runDraftAction(button.dataset.draftAction, draft).catch((error) => {
+                    toast(error.message, "error");
+                });
+            });
+        });
+        body.append(row);
+    });
+}
+
+async function runDraftAction(action, draft) {
+    if (action === "open") {
+        await openDraft(draft);
+        return;
+    }
+    if (action === "rename") {
+        openDraftDialog(draft);
+        return;
+    }
+    if (action === "publish") {
+        await publishDraft(draft);
+        return;
+    }
+    if (action === "delete") {
+        await removeDraft(draft);
+    }
+}
+
+async function showLiveSchedule() {
+    const hadDraft = Boolean(state.draftId);
+    state.draftId = null;
+    state.draftName = "";
+    switchView("schedule");
+    render();
+    if (hadDraft) {
+        await loadLessons();
+        render();
+    }
+}
+
+async function openDraft(draft) {
+    state.draftId = draft.id;
+    state.draftName = draft.name;
+    switchView("schedule");
+    await loadLessons();
+    render();
+}
+
+function openDraftDialog(draft = null) {
+    if (!isAdmin()) {
+        return;
+    }
+    $("#draft-id").value = draft ? String(draft.id) : "";
+    $("#draft-name").value = draft?.name || "";
+    $("#draft-dialog-title").textContent = draft ? "Переименовать черновик" : "Новый черновик";
+    $("#draft-submit").textContent = draft ? "Сохранить" : "Создать";
+    $("#draft-source-field")?.classList.toggle("hidden", Boolean(draft));
+    const current = document.querySelector('input[name="draft-source"][value="current"]');
+    if (current) {
+        current.checked = true;
+    }
+    setDialogError($("#draft-error"), "");
+    $("#draft-dialog").showModal();
+    $("#draft-name")?.focus();
+}
+
+async function saveDraft(event) {
+    event.preventDefault();
+    if (!isAdmin()) {
+        return;
+    }
+
+    const error = $("#draft-error");
+    const button = $("#draft-submit");
+    const name = $("#draft-name").value.trim();
+    setDialogError(error, "");
+    if (!name) {
+        setDialogError(error, "Укажите название черновика.");
+        return;
+    }
+
+    const id = $("#draft-id").value;
+    const source = document.querySelector('input[name="draft-source"]:checked')?.value || "current";
+    button.disabled = true;
+    try {
+        if (id) {
+            await api(`/api/drafts/${id}`, {
+                method: "PUT",
+                body: JSON.stringify({ name }),
+            });
+            if (Number(state.draftId) === Number(id)) {
+                state.draftName = name;
+            }
+            $("#draft-dialog").close();
+            await loadDrafts();
+            render();
+            toast("Черновик переименован.");
+            return;
+        }
+
+        const created = await api("/api/drafts", {
+            method: "POST",
+            body: JSON.stringify({ name, source }),
+        });
+        $("#draft-dialog").close();
+        await loadDrafts();
+        toast(source === "empty"
+            ? "Пустой черновик создан."
+            : "Черновик создан из текущего расписания.");
+        await openDraft(created);
+    } catch (err) {
+        setDialogError(error, err.message);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function publishDraft(draft) {
+    const count = Number(draft.lesson_count) || 0;
+    const message = count
+        ? `Текущее расписание будет полностью заменено черновиком «${draft.name}» (${count} занятий). Студенты сразу увидят новую версию. Сам черновик останется.`
+        : `Черновик «${draft.name}» пустой. Текущее расписание будет очищено, и студенты сразу увидят пустую сетку.`;
+    if (!(await confirmDialog(message, "Замена расписания", "Заменить"))) {
+        return;
+    }
+
+    const result = await api(`/api/drafts/${draft.id}/publish`, { method: "POST" });
+    await loadDrafts();
+    if (!state.draftId) {
+        await loadLessons();
+    }
+    render();
+    toast(`Текущее расписание заменено. Занятий: ${result.lessons}.`);
+}
+
+async function removeDraft(draft) {
+    if (!(await confirmDialog(
+        `Удалить черновик «${draft.name}»? Текущее расписание не изменится.`,
+    ))) {
+        return;
+    }
+
+    await api(`/api/drafts/${draft.id}`, { method: "DELETE" });
+    if (Number(state.draftId) === Number(draft.id)) {
+        state.draftId = null;
+        state.draftName = "";
+        state.view = "drafts";
+        await loadLessons();
+    }
+    await loadDrafts();
+    switchView("drafts");
+    render();
+    toast("Черновик удалён.");
 }
 
 function setDialogError(node, message) {
@@ -2511,8 +2826,31 @@ function setup() {
     $("#directory-form").addEventListener("submit", saveDirectory);
     $("#teacher-subjects-form").addEventListener("submit", saveTeacherSubjects);
 
+    $("#draft-add-button")?.addEventListener("click", () => openDraftDialog());
+    $("#draft-form")?.addEventListener("submit", saveDraft);
+    $("#draft-list-button")?.addEventListener("click", () => switchView("drafts"));
+    $("#draft-publish-button")?.addEventListener("click", async () => {
+        const draft = state.drafts.find((item) => Number(item.id) === Number(state.draftId));
+        if (!draft) {
+            return;
+        }
+        try {
+            await publishDraft(draft);
+        } catch (error) {
+            toast(error.message, "error");
+        }
+    });
+
     document.querySelectorAll("[data-view]").forEach((control) => {
-        control.addEventListener("click", () => {
+        control.addEventListener("click", async () => {
+            if (control.dataset.view === "schedule") {
+                try {
+                    await showLiveSchedule();
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+                return;
+            }
             switchView(control.dataset.view, control.dataset.directory || null);
         });
     });

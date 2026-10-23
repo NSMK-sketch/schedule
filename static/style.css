@@ -427,6 +427,7 @@ textarea:focus {
     display: flex;
     align-items: center;
     gap: 10px;
+    text-decoration: none;
     padding: 11px 12px;
     border: 0;
     border-radius: 8px;
@@ -470,6 +471,120 @@ textarea:focus {
 
 .side-link.active .side-count {
     background: rgba(40, 120, 214, 0.18);
+    color: var(--primary);
+}
+
+.draft-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    overflow-x: auto;
+}
+
+.draft-tab {
+    flex: 0 0 auto;
+    max-width: 220px;
+    min-height: 34px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.draft-tab:hover,
+.draft-tab.active {
+    border-color: transparent;
+    background: var(--primary);
+    color: #fff;
+}
+
+.draft-tab-add {
+    border-style: dashed;
+    background: transparent;
+}
+
+.draft-tab-add:hover {
+    border-style: solid;
+}
+
+.draft-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding: 10px 14px;
+    border: 1px solid rgba(234, 179, 8, 0.45);
+    border-radius: 10px;
+    background: rgba(234, 179, 8, 0.12);
+}
+
+.draft-banner strong {
+    display: block;
+    margin-bottom: 2px;
+}
+
+.draft-banner span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.draft-banner-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+}
+
+.draft-source-field {
+    display: grid;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 0;
+    border: 0;
+}
+
+.draft-source-field legend {
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.draft-source-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+}
+
+.draft-source-option input {
+    width: 18px;
+    min-height: 18px;
+    margin: 0;
+}
+
+.drafts-table-wrap {
+    border-top: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.draft-name {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-weight: 800;
+    text-align: left;
+}
+
+.draft-name:hover {
     color: var(--primary);
 }
 

@@ -11,6 +11,7 @@ WELCOME_TEXT = (
     "Нажмите кнопку, выберите свою группу — откроется расписание на учебные недели."
 )
 _COMMANDS = {"start", "старт", "расписание", "начать"}
+_CHAT_ID_COMMANDS = {"chatid", "чатid", "idчата"}
 _UPDATE_TYPES = ["bot_started", "message_created"]
 _polling_started = False
 _last_reply_at = {}
@@ -99,6 +100,31 @@ def schedule_requested(update):
     return _command(_message_text(update)) in _COMMANDS
 
 
+def build_chat_id_reply(update):
+    """Tell an admin the id of the chat where the bot should post changes."""
+    if not isinstance(update, dict):
+        return None
+    if update.get("update_type") != "message_created" or _sender_is_bot(update):
+        return None
+    if _command(_message_text(update)) not in _CHAT_ID_COMMANDS:
+        return None
+    user_id = _user_id(update)
+    chat_id = _chat_id(update)
+    if user_id is None and chat_id is None:
+        return None
+    lines = ["Этот номер нужно вставить в «Замены» → чат для уведомлений."]
+    if chat_id is not None:
+        lines.insert(0, f"ID чата: {chat_id}")
+    if user_id is not None and str(user_id) != str(chat_id):
+        lines.insert(1 if chat_id is not None else 0, f"ID пользователя: {user_id}")
+    return {
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "text": "\n".join(lines),
+        "attachments": None,
+    }
+
+
 def build_reply(update, miniapp_url="", bot_username="", bot_user_id=None):
     """Return a send_message payload, or None when the update needs no reply."""
     if not schedule_requested(update):
@@ -137,7 +163,9 @@ def _reply_key(reply):
 
 
 def handle_update(update, client, miniapp_url="", bot_username="", bot_user_id=None):
-    reply = build_reply(update, miniapp_url, bot_username, bot_user_id)
+    reply = build_chat_id_reply(update) or build_reply(
+        update, miniapp_url, bot_username, bot_user_id
+    )
     if reply is None:
         return False
     key = _reply_key(reply)

@@ -87,7 +87,15 @@ class MaxClient:
             timeout=timeout + 15,
         )
 
-    def send_message(self, *, user_id=None, chat_id=None, text="", attachments=None):
+    def send_message(
+        self,
+        *,
+        user_id=None,
+        chat_id=None,
+        text="",
+        attachments=None,
+        text_format=None,
+    ):
         params = {}
         if user_id is not None:
             params["user_id"] = user_id
@@ -96,6 +104,8 @@ class MaxClient:
         else:
             raise ValueError("user_id or chat_id is required")
         body = {"text": text}
+        if text_format:
+            body["format"] = text_format
         if attachments:
             body["attachments"] = attachments
         return self.request("POST", "/messages", params=params, json_body=body, timeout=20)

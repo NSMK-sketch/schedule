@@ -11,8 +11,30 @@ DAYS = {
 }
 
 
-def list_lessons(week=None, group_id=None):
-    query = """
+def _lesson_table(draft_id):
+    if draft_id is None:
+        return "lessons"
+    return "draft_lessons"
+
+
+def _lesson_source(draft_id):
+    """FROM-clause. Draft rows are aliased as lessons so the select list stays shared."""
+    if draft_id is None:
+        return "lessons"
+    return "draft_lessons AS lessons"
+
+
+def _touch_draft(db, draft_id):
+    if draft_id is None:
+        return
+    db.execute(
+        "UPDATE schedule_drafts SET updated_at = datetime('now') WHERE id = ?",
+        (int(draft_id),),
+    )
+
+
+def list_lessons(week=None, group_id=None, draft_id=None):
+    query = f"""
         SELECT
             lessons.*,
             groups_ref.name AS group_name,
@@ -29,7 +51,7 @@ def list_lessons(week=None, group_id=None):
             subjects.color AS subject_color,
             classrooms.name AS classroom_name,
             classrooms2.name AS classroom2_name
-        FROM lessons
+        FROM {_lesson_source(draft_id)}
         JOIN groups_ref ON groups_ref.id = lessons.group_id
         JOIN teachers ON teachers.id = lessons.teacher_id
         LEFT JOIN teachers AS teachers2 ON teachers2.id = lessons.teacher2_id
@@ -39,6 +61,10 @@ def list_lessons(week=None, group_id=None):
         WHERE 1 = 1
     """
     params = []
+
+    if draft_id is not None:
+        query += " AND lessons.draft_id = ?"
+        params.append(int(draft_id))
 
     if week in (1, 2):
         query += " AND lessons.week = ?"
@@ -107,7 +133,7 @@ def validate_lesson(data):
     return None
 
 
-def conflict_message(data, exclude_id=None):
+def conflict_message(data, exclude_id=None, draft_id=None):
     """Return a human-readable conflict that names the colliding resource.
 
     Group / teacher / classroom conflicts apply even if subject is not chosen yet.
@@ -144,7 +170,7 @@ def conflict_message(data, exclude_id=None):
                 teachers2.full_name AS teacher2_name,
                 classrooms.name AS classroom_name,
                 classrooms2.name AS classroom2_name
-            FROM lessons
+            FROM {_lesson_source(draft_id)}
             JOIN groups_ref ON groups_ref.id = lessons.group_id
             JOIN teachers ON teachers.id = lessons.teacher_id
             LEFT JOIN teachers AS teachers2 ON teachers2.id = lessons.teacher2_id
@@ -156,6 +182,9 @@ def conflict_message(data, exclude_id=None):
               AND {extra_sql}
         """
         values = [week, weekday, period, *params]
+        if draft_id is not None:
+            query += " AND lessons.draft_id = ?"
+            values.append(int(draft_id))
         if exclude_id:
             query += " AND lessons.id != ?"
             values.append(exclude_id)
@@ -293,7 +322,7 @@ def _ensure_teachers_exist(db, teacher_id, teacher2_id):
     return None
 
 
-def create_lesson(data):
+def create_lesson(data, draft_id=None):
     force = bool(data.get("force"))
     error = validate_lesson(data)
     if error:
@@ -320,39 +349,79 @@ def create_lesson(data):
             )
 
     if not force:
-        conflict = conflict_message(data)
+        conflict = conflict_message(data, draft_id=draft_id)
         if conflict:
             return None, conflict
 
-    cursor = db.execute(
-        """
-        INSERT INTO lessons (
-            group_id, teacher_id, teacher2_id, subject_id,
-            classroom_id, classroom2_id,
-            weekday, period, week, lesson_type, note
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            data["group_id"],
-            data["teacher_id"],
-            data["teacher2_id"],
-            data["subject_id"],
-            data["classroom_id"],
-            data["classroom2_id"],
-            data["weekday"],
-            data["period"],
-            data["week"],
-            data["lesson_type"],
-            data["note"],
-        ),
-    )
+    table = _lesson_table(draft_id)
+    if draft_id is None:
+        cursor = db.execute(
+            f"""
+            INSERT INTO {table} (
+                group_id, teacher_id, teacher2_id, subject_id,
+                classroom_id, classroom2_id,
+                weekday, period, week, lesson_type, note
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data["group_id"],
+                data["teacher_id"],
+                data["teacher2_id"],
+                data["subject_id"],
+                data["classroom_id"],
+                data["classroom2_id"],
+                data["weekday"],
+                data["period"],
+                data["week"],
+                data["lesson_type"],
+                data["note"],
+            ),
+        )
+    else:
+        cursor = db.execute(
+            f"""
+            INSERT INTO {table} (
+                draft_id, group_id, teacher_id, teacher2_id, subject_id,
+                classroom_id, classroom2_id,
+                weekday, period, week, lesson_type, note
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                int(draft_id),
+                data["group_id"],
+                data["teacher_id"],
+                data["teacher2_id"],
+                data["subject_id"],
+                data["classroom_id"],
+                data["classroom2_id"],
+                data["weekday"],
+                data["period"],
+                data["week"],
+                data["lesson_type"],
+                data["note"],
+            ),
+        )
+    _touch_draft(db, draft_id)
     db.commit()
     return cursor.lastrowid, None
 
 
-def update_lesson(lesson_id, data):
+def _lesson_exists(db, lesson_id, draft_id):
+    table = _lesson_table(draft_id)
+    if draft_id is None:
+        return db.execute(
+            f"SELECT id FROM {table} WHERE id = ?",
+            (lesson_id,),
+        ).fetchone()
+    return db.execute(
+        f"SELECT id FROM {table} WHERE id = ? AND draft_id = ?",
+        (lesson_id, int(draft_id)),
+    ).fetchone()
+
+
+def update_lesson(lesson_id, data, draft_id=None):
     force = bool(data.get("force"))
-    if not get_db().execute("SELECT id FROM lessons WHERE id = ?", (lesson_id,)).fetchone():
+    if not _lesson_exists(get_db(), lesson_id, draft_id):
         return False, "Занятие не найдено."
 
     error = validate_lesson(data)
@@ -380,45 +449,62 @@ def update_lesson(lesson_id, data):
             )
 
     if not force:
-        conflict = conflict_message(data, lesson_id)
+        conflict = conflict_message(data, lesson_id, draft_id=draft_id)
         if conflict:
             return False, conflict
 
+    table = _lesson_table(draft_id)
+    where = "id = ?"
+    params = [
+        data["group_id"],
+        data["teacher_id"],
+        data["teacher2_id"],
+        data["subject_id"],
+        data["classroom_id"],
+        data["classroom2_id"],
+        data["weekday"],
+        data["period"],
+        data["week"],
+        data["lesson_type"],
+        data["note"],
+        lesson_id,
+    ]
+    if draft_id is not None:
+        where += " AND draft_id = ?"
+        params.append(int(draft_id))
+
     db.execute(
-        """
-        UPDATE lessons
+        f"""
+        UPDATE {table}
         SET group_id = ?, teacher_id = ?, teacher2_id = ?, subject_id = ?,
             classroom_id = ?, classroom2_id = ?,
             weekday = ?, period = ?, week = ?, lesson_type = ?, note = ?
-        WHERE id = ?
+        WHERE {where}
         """,
-        (
-            data["group_id"],
-            data["teacher_id"],
-            data["teacher2_id"],
-            data["subject_id"],
-            data["classroom_id"],
-            data["classroom2_id"],
-            data["weekday"],
-            data["period"],
-            data["week"],
-            data["lesson_type"],
-            data["note"],
-            lesson_id,
-        ),
+        params,
     )
+    _touch_draft(db, draft_id)
     db.commit()
     return True, None
 
 
-def delete_lesson(lesson_id):
+def delete_lesson(lesson_id, draft_id=None):
     db = get_db()
-    cursor = db.execute("DELETE FROM lessons WHERE id = ?", (lesson_id,))
+    table = _lesson_table(draft_id)
+    if draft_id is None:
+        cursor = db.execute(f"DELETE FROM {table} WHERE id = ?", (lesson_id,))
+    else:
+        cursor = db.execute(
+            f"DELETE FROM {table} WHERE id = ? AND draft_id = ?",
+            (lesson_id, int(draft_id)),
+        )
+    if cursor.rowcount:
+        _touch_draft(db, draft_id)
     db.commit()
     return cursor.rowcount > 0
 
 
-def copy_week(source_week, target_week):
+def copy_week(source_week, target_week, draft_id=None):
     """Copy all lessons from one week onto another, overwriting the target week."""
     if source_week not in (1, 2) or target_week not in (1, 2):
         return False, "Неделя должна быть 1 или 2.", 0, 0
@@ -427,17 +513,23 @@ def copy_week(source_week, target_week):
         return False, "Нельзя копировать расписание на ту же неделю.", 0, 0
 
     db = get_db()
+    table = _lesson_table(draft_id)
+    draft_sql = ""
+    params = [source_week]
+    if draft_id is not None:
+        draft_sql = " AND draft_id = ?"
+        params.append(int(draft_id))
     lessons = db.execute(
-        """
+        f"""
         SELECT
             group_id, teacher_id, teacher2_id, subject_id,
             classroom_id, classroom2_id,
             weekday, period, lesson_type, note
-        FROM lessons
-        WHERE week = ?
+        FROM {table}
+        WHERE week = ?{draft_sql}
         ORDER BY weekday, period, id
         """,
-        (source_week,),
+        params,
     ).fetchall()
 
     if not lessons:
@@ -445,35 +537,68 @@ def copy_week(source_week, target_week):
 
     try:
         db.execute("BEGIN")
-        removed = db.execute(
-            "DELETE FROM lessons WHERE week = ?",
-            (target_week,),
-        ).rowcount
-        db.executemany(
-            """
-            INSERT INTO lessons (
-                group_id, teacher_id, teacher2_id, subject_id,
-                classroom_id, classroom2_id,
-                weekday, period, week, lesson_type, note
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                (
-                    lesson["group_id"],
-                    lesson["teacher_id"],
-                    lesson["teacher2_id"],
-                    lesson["subject_id"],
-                    lesson["classroom_id"],
-                    lesson["classroom2_id"],
-                    lesson["weekday"],
-                    lesson["period"],
-                    target_week,
-                    lesson["lesson_type"],
-                    lesson["note"],
-                )
-                for lesson in lessons
-            ],
-        )
+        if draft_id is None:
+            removed = db.execute(
+                f"DELETE FROM {table} WHERE week = ?",
+                (target_week,),
+            ).rowcount
+            db.executemany(
+                f"""
+                INSERT INTO {table} (
+                    group_id, teacher_id, teacher2_id, subject_id,
+                    classroom_id, classroom2_id,
+                    weekday, period, week, lesson_type, note
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        lesson["group_id"],
+                        lesson["teacher_id"],
+                        lesson["teacher2_id"],
+                        lesson["subject_id"],
+                        lesson["classroom_id"],
+                        lesson["classroom2_id"],
+                        lesson["weekday"],
+                        lesson["period"],
+                        target_week,
+                        lesson["lesson_type"],
+                        lesson["note"],
+                    )
+                    for lesson in lessons
+                ],
+            )
+        else:
+            removed = db.execute(
+                f"DELETE FROM {table} WHERE week = ? AND draft_id = ?",
+                (target_week, int(draft_id)),
+            ).rowcount
+            db.executemany(
+                f"""
+                INSERT INTO {table} (
+                    draft_id, group_id, teacher_id, teacher2_id, subject_id,
+                    classroom_id, classroom2_id,
+                    weekday, period, week, lesson_type, note
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        int(draft_id),
+                        lesson["group_id"],
+                        lesson["teacher_id"],
+                        lesson["teacher2_id"],
+                        lesson["subject_id"],
+                        lesson["classroom_id"],
+                        lesson["classroom2_id"],
+                        lesson["weekday"],
+                        lesson["period"],
+                        target_week,
+                        lesson["lesson_type"],
+                        lesson["note"],
+                    )
+                    for lesson in lessons
+                ],
+            )
+        _touch_draft(db, draft_id)
         db.commit()
     except Exception:
         db.rollback()

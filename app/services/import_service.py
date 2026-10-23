@@ -201,13 +201,16 @@ def clear_directory(name: str) -> dict:
 
     if name == "groups":
         # Every lesson references a group — clearing groups clears the schedule.
+        db.execute("DELETE FROM draft_lessons")
         removed_lessons = db.execute("DELETE FROM lessons").rowcount
         removed_items = db.execute("DELETE FROM groups_ref").rowcount
     elif name == "teachers":
+        db.execute("DELETE FROM draft_lessons")
         removed_lessons = db.execute("DELETE FROM lessons").rowcount
         db.execute("DELETE FROM teacher_subjects")
         removed_items = db.execute("DELETE FROM teachers").rowcount
     elif name == "subjects":
+        db.execute("DELETE FROM draft_lessons WHERE subject_id IS NOT NULL")
         removed_lessons = db.execute(
             "DELETE FROM lessons WHERE subject_id IS NOT NULL"
         ).rowcount
@@ -219,6 +222,12 @@ def clear_directory(name: str) -> dict:
         )
         db.execute(
             "UPDATE lessons SET classroom2_id = NULL WHERE classroom2_id IS NOT NULL"
+        )
+        db.execute(
+            "UPDATE draft_lessons SET classroom_id = NULL WHERE classroom_id IS NOT NULL"
+        )
+        db.execute(
+            "UPDATE draft_lessons SET classroom2_id = NULL WHERE classroom2_id IS NOT NULL"
         )
         removed_items = db.execute("DELETE FROM classrooms").rowcount
         removed_lessons = 0
