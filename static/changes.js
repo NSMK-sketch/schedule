@@ -301,6 +301,7 @@ function renderEditor() {
             <div class="editor-actions">
                 ${locked ? "" : `<button type="button" id="add-row">+ Строка</button>`}
                 ${locked ? "" : `<button type="button" id="save-sheet">Сохранить</button>`}
+                <button type="button" id="print-sheet">Печать</button>
                 ${
                     locked
                         ? `<button type="button" id="unpublish-sheet">Снять с публикации</button>
@@ -344,6 +345,87 @@ function readSheetFromDom() {
         week: Number(sheet.week),
         rows,
     };
+}
+
+function lessonLabel(row) {
+    const subject = String(row.new_subject || "").trim();
+    const room = String(row.new_room || "").trim();
+    const teacher = String(row.new_teacher || "").trim();
+    if (!subject && !room && !teacher) {
+        return "снято";
+    }
+    if (room && subject) {
+        return `${subject} (ауд.${room})`;
+    }
+    if (room) {
+        return `ауд.${room}`;
+    }
+    return subject;
+}
+
+function filledPrintRows(rows) {
+    return rows.filter((row) =>
+        [
+            row.group_name,
+            row.periods,
+            row.new_subject,
+            row.new_room,
+            row.new_teacher,
+            row.old_subject,
+            row.absent_teacher,
+        ].some((value) => String(value || "").trim()),
+    );
+}
+
+function renderPrintRoot(payload) {
+    const root = $("#print-root");
+    if (!root) {
+        return;
+    }
+    const dateLabel = payload.sheet_date
+        ? payload.sheet_date.split("-").reverse().join(".")
+        : "";
+    const rows = filledPrintRows(payload.rows);
+    const body = rows.length
+        ? rows
+              .map(
+                  (row) => `
+            <tr>
+                <td>${esc(row.group_name)}</td>
+                <td class="center">${esc(String(row.periods || "").trim())}</td>
+                <td>${esc(lessonLabel(row))}</td>
+                <td>${esc(String(row.new_teacher || "").trim())}</td>
+                <td>${esc(String(row.old_subject || "").trim())}</td>
+                <td>${esc(String(row.absent_teacher || "").trim())}</td>
+            </tr>`,
+              )
+              .join("")
+        : `<tr><td colspan="6" class="center">Строк нет.</td></tr>`;
+    root.innerHTML = `
+        <table class="paper">
+            <thead>
+                <tr><th class="paper-title" colspan="6">${esc(previewTitle(payload.sheet_date, payload.week))}</th></tr>
+                <tr>
+                    <th class="col-group">Группа</th>
+                    <th class="col-period">пара</th>
+                    <th colspan="2">${esc(dateLabel)}</th>
+                    <th colspan="2">Заменяемый предмет;<br>Отсутствующий преподаватель</th>
+                </tr>
+            </thead>
+            <tbody>${body}</tbody>
+        </table>
+        <p class="paper-note">Замена только на ${esc(dateLabel)}. На следующей неделе в этот день снова обычное расписание.</p>
+    `;
+}
+
+function printCurrentSheet() {
+    const payload = readSheetFromDom();
+    if (!filledPrintRows(payload.rows).length) {
+        showNotice("Добавьте строки — печатать нечего.");
+        return;
+    }
+    renderPrintRoot(payload);
+    window.print();
 }
 
 function rememberRowsLocally() {
@@ -483,6 +565,10 @@ function bindEditor() {
             renderEditor();
             return;
         }
+        if (event.target.closest("#print-sheet")) {
+            printCurrentSheet();
+            return;
+        }
         if (event.target.closest("#add-row")) {
             rememberRowsLocally();
             state.current.rows.push(blankRow());
@@ -600,6 +686,13 @@ async function init() {
         } catch (error) {
             showNotice(error.message);
         }
+    });
+
+    window.addEventListener("beforeprint", () => {
+        if (!state.current || !$("#sheet-date")) {
+            return;
+        }
+        renderPrintRoot(readSheetFromDom());
     });
 
     window.addEventListener("beforeunload", (event) => {
