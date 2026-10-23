@@ -192,7 +192,7 @@ function teacherSheetName(teacher) {
     if (!teacher) {
         return "";
     }
-    return String(teacher.short_name || "").trim() || paperTeacher(teacher.full_name);
+    return String(teacher.full_name || "").trim() || String(teacher.short_name || "").trim();
 }
 
 function plannedLesson(groupId, week, weekday, periods) {
@@ -406,7 +406,12 @@ function refreshRowSuggestions(row, skipField) {
         if (skipField !== teacherField) {
             const listId = row.querySelector(`[data-field="${teacherField}"]`)?.getAttribute("list");
             const labels = [];
-            teachersFor(group, subject).forEach((item) => labels.push(...teacherLabels(item)));
+            teachersFor(group, subject).forEach((item) => {
+                const name = String(item.full_name || "").trim();
+                if (name) {
+                    labels.push(name);
+                }
+            });
             setOptions(listId, labels);
         }
     });
