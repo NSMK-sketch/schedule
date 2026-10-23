@@ -84,7 +84,12 @@ def create_app(test_config=None):
     def changes_admin():
         if session.get("role") != "admin":
             return redirect(url_for("admin"))
-        return render_template("changes.html")
+        from app.services.substitution_service import get_notify_chat
+
+        return render_template(
+            "changes.html",
+            notify_chat=get_notify_chat().get("chat_id") or "",
+        )
 
     @app.get("/changes/<int:sheet_id>")
     def changes_public(sheet_id):

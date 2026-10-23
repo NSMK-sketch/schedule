@@ -30,12 +30,24 @@ function esc(value) {
     })[char]);
 }
 
-async function api(url, options = {}) {
+function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function api(url, options = {}, attempt = 0) {
     const response = await fetch(url, {
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", ...(options.headers || {}) },
         ...options,
     });
+    if (response.status === 429 && attempt < 2) {
+        await wait(700 * (attempt + 1));
+        return api(url, options, attempt + 1);
+    }
+    if (response.status === 401) {
+        window.location.href = "/admin";
+        throw new Error("Требуется авторизация.");
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
         throw new Error(data.error || "Не удалось выполнить запрос.");
@@ -535,20 +547,11 @@ function bindEditor() {
 }
 
 async function init() {
-    const me = await api("/api/auth/me");
-    if (!me.authenticated || me.role !== "admin") {
-        window.location.href = "/admin";
-        return;
-    }
-    const [bootstrap, chat] = await Promise.all([
-        api("/api/bootstrap"),
-        api("/api/substitutions/notify-chat"),
-    ]);
+    state.chatId = $("#chat-id").value.trim();
+    const bootstrap = await api("/api/bootstrap");
     state.groups = bootstrap.groups || [];
     state.subjects = bootstrap.subjects || [];
     state.teachers = bootstrap.teachers || [];
-    state.chatId = chat.chat_id || "";
-    $("#chat-id").value = state.chatId;
     fillLists();
     await refreshList();
     render();
