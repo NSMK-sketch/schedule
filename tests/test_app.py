@@ -180,6 +180,16 @@ class ScheduleAppTestCase(unittest.TestCase):
         self.assertIn((1, 1), group_one)
         self.assertIn((1, 2), group_one)
         self.assertIn((2, 4), group_one)
+        monday = next(
+            item
+            for item in bootstrap["schedule_slots"]
+            if item["group_id"] == 1
+            and item["week"] == 1
+            and item["weekday"] == 1
+            and item["period"] == 1
+        )
+        self.assertEqual(monday["teacher_id"], 1)
+        self.assertEqual(monday["subject_id"], 1)
 
     def test_lesson_update_not_hijacked_by_reference_route(self):
         self.client.post(

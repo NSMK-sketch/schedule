@@ -149,6 +149,24 @@ def bootstrap():
                     """
                 )
             ],
+            "schedule_slots": [
+                {
+                    "week": row["week"],
+                    "weekday": row["weekday"],
+                    "period": row["period"],
+                    "group_id": row["group_id"],
+                    "teacher_id": row["teacher_id"],
+                    "teacher2_id": row["teacher2_id"],
+                    "subject_id": row["subject_id"],
+                }
+                for row in db.execute(
+                    """
+                    SELECT week, weekday, period, group_id,
+                           teacher_id, teacher2_id, subject_id
+                    FROM lessons
+                    """
+                )
+            ],
         }
     )
 

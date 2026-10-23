@@ -16,6 +16,10 @@ const state = {
     teachers: [],
     teacherSubjects: [],
     links: [],
+    slots: [],
+    slotIndex: new Map(),
+    subjectById: new Map(),
+    teacherById: new Map(),
     groupByName: new Map(),
     subjectByName: new Map(),
     teacherByName: new Map(),
@@ -133,11 +137,135 @@ function indexCatalog() {
         }
     });
     state.teacherByName = new Map();
+    state.teacherById = new Map();
     state.teachers.forEach((teacher) => {
+        state.teacherById.set(Number(teacher.id), teacher);
         teacherLabels(teacher).forEach((label) => {
             state.teacherByName.set(normKey(label), teacher);
         });
     });
+    state.subjectById = new Map();
+    state.subjects.forEach((subject) => {
+        state.subjectById.set(Number(subject.id), subject);
+    });
+    state.slotIndex = new Map();
+    state.slots.forEach((slot) => {
+        const key = [
+            Number(slot.group_id),
+            Number(slot.week),
+            Number(slot.weekday),
+            Number(slot.period),
+        ].join("|");
+        if (!state.slotIndex.has(key)) {
+            state.slotIndex.set(key, []);
+        }
+        state.slotIndex.get(key).push(slot);
+    });
+}
+
+function parsePeriods(value) {
+    const text = String(value || "").trim();
+    if (!text || text.length > 40) {
+        return null;
+    }
+    const periods = [];
+    for (const chunk of text.replace(/\./g, ",").split(/[\s,;]+/)) {
+        if (!chunk) {
+            continue;
+        }
+        if (!/^\d+$/.test(chunk)) {
+            return null;
+        }
+        const number = Number(chunk);
+        if (number < 1 || number > 8 || periods.includes(number)) {
+            if (number < 1 || number > 8) {
+                return null;
+            }
+            continue;
+        }
+        periods.push(number);
+    }
+    return periods.length ? periods : null;
+}
+
+function teacherSheetName(teacher) {
+    if (!teacher) {
+        return "";
+    }
+    return String(teacher.short_name || "").trim() || paperTeacher(teacher.full_name);
+}
+
+function plannedLesson(groupId, week, weekday, periods) {
+    const subjects = [];
+    const teachers = [];
+    const seenSubjects = new Set();
+    const seenTeachers = new Set();
+    periods.forEach((period) => {
+        const slots = state.slotIndex.get(`${groupId}|${week}|${weekday}|${period}`) || [];
+        slots.forEach((slot) => {
+            const subject = state.subjectById.get(Number(slot.subject_id));
+            const subjectName = subject ? String(subject.name || "").trim() : "";
+            const subjectKey = normKey(subjectName);
+            if (subjectName && !seenSubjects.has(subjectKey)) {
+                seenSubjects.add(subjectKey);
+                subjects.push(subjectName);
+            }
+            [slot.teacher_id, slot.teacher2_id].forEach((teacherId) => {
+                const teacher = state.teacherById.get(Number(teacherId));
+                const name = teacherSheetName(teacher);
+                const key = normKey(name);
+                if (name && !seenTeachers.has(key)) {
+                    seenTeachers.add(key);
+                    teachers.push(name);
+                }
+            });
+        });
+    });
+    return {
+        subject: subjects.join(", "),
+        teacher: teachers.join(", "),
+    };
+}
+
+function setAutoField(row, field, dataKey, next) {
+    const input = row.querySelector(`[data-field="${field}"]`);
+    if (!input || input.disabled) {
+        return false;
+    }
+    const previous = row.dataset[dataKey] || "";
+    const current = input.value.trim();
+    if (current && current !== previous) {
+        return false;
+    }
+    row.dataset[dataKey] = next;
+    if (current === next) {
+        return false;
+    }
+    input.value = next;
+    return true;
+}
+
+function applyPlannedLesson(row) {
+    if (!state.current || state.current.status === "published") {
+        return false;
+    }
+    const periodsText = fieldValue(row, "periods").trim();
+    const periods = parsePeriods(periodsText);
+    if (periodsText && !periods) {
+        return false;
+    }
+    const group = findGroup(fieldValue(row, "group_name"));
+    const dateInput = $("#sheet-date");
+    const date = dateInput ? dateInput.value : state.current.sheet_date;
+    const weekday = date ? weekdayOf(date) : 0;
+    const week = Number(state.current.week);
+    let planned = { subject: "", teacher: "" };
+    if (group && periods && weekday >= 1 && weekday <= 6 && (week === 1 || week === 2)) {
+        planned = plannedLesson(group.id, week, weekday, periods);
+    }
+    const subjectChanged = setAutoField(row, "old_subject", "autoSubject", planned.subject);
+    const teacherChanged = setAutoField(row, "absent_teacher", "autoTeacher", planned.teacher);
+    return subjectChanged || teacherChanged;
 }
 
 function findGroup(name) {
@@ -337,7 +465,7 @@ function rowHtml(row, locked) {
     const oldSubjectList = suggestionList();
     const absentTeacherList = suggestionList();
     return `
-        <tr>
+        <tr data-auto-subject="${esc(row.auto_subject || "")}" data-auto-teacher="${esc(row.auto_teacher || "")}">
             <td>
                 <input data-field="group_name" list="group-options" autocomplete="off" value="${esc(groupLabel(row))}"${disabled}>
             </td>
@@ -473,7 +601,16 @@ function renderEditor() {
             ${notify}
         </section>
     `;
-    root.querySelectorAll("#change-rows tr").forEach((row) => refreshRowSuggestions(row));
+    let filledFromSchedule = false;
+    root.querySelectorAll("#change-rows tr").forEach((row) => {
+        if (applyPlannedLesson(row)) {
+            filledFromSchedule = true;
+        }
+        refreshRowSuggestions(row);
+    });
+    if (filledFromSchedule) {
+        markDirty();
+    }
 }
 
 function render() {
@@ -499,6 +636,8 @@ function readSheetFromDom() {
             new_teacher: row.querySelector("[data-field='new_teacher']").value,
             old_subject: row.querySelector("[data-field='old_subject']").value,
             absent_teacher: row.querySelector("[data-field='absent_teacher']").value,
+            auto_subject: row.dataset.autoSubject || "",
+            auto_teacher: row.dataset.autoTeacher || "",
         };
     });
     return {
@@ -678,9 +817,14 @@ function bindEditor() {
             markDirty();
         }
         const field = event.target.closest("#change-rows [data-field]");
-        if (field) {
-            refreshRowSuggestions(field.closest("tr"), field.dataset.field);
+        if (!field) {
+            return;
         }
+        const row = field.closest("tr");
+        if (field.dataset.field === "group_name" || field.dataset.field === "periods") {
+            applyPlannedLesson(row);
+        }
+        refreshRowSuggestions(row, field.dataset.field);
     });
     $("#editor").addEventListener("focusin", (event) => {
         const field = event.target.closest("#change-rows [data-field]");
@@ -700,6 +844,10 @@ function bindEditor() {
             if (title && state.current) {
                 title.textContent = previewTitle(event.target.value, state.current.week);
             }
+            document.querySelectorAll("#change-rows tr").forEach((row) => {
+                applyPlannedLesson(row);
+                refreshRowSuggestions(row);
+            });
             markDirty();
         }
     });
@@ -816,6 +964,7 @@ async function init() {
         teacherId: Number(link.teacher_id),
         subjectId: Number(link.subject_id),
     }));
+    state.slots = bootstrap.schedule_slots || [];
     indexCatalog();
     fillGroupList();
     await refreshList();
