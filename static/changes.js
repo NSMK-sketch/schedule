@@ -14,9 +14,16 @@ const state = {
     groups: [],
     subjects: [],
     teachers: [],
+    teacherSubjects: [],
+    links: [],
+    groupByName: new Map(),
+    subjectByName: new Map(),
+    teacherByName: new Map(),
     chatId: "",
     dirty: false,
 };
+
+let suggestionSeq = 0;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -101,48 +108,193 @@ function paperTeacher(fullName) {
     return `${parts[0]}${initials}`;
 }
 
-function fillLists() {
-    const subjects = $("#subject-options");
-    subjects.innerHTML = state.subjects
-        .map((item) => `<option value="${esc(item.name)}"></option>`)
-        .join("");
-    const teachers = $("#teacher-options");
-    const names = new Set();
-    state.teachers.forEach((teacher) => {
-        [paperTeacher(teacher.full_name), teacher.short_name, teacher.full_name]
-            .filter(Boolean)
-            .forEach((name) => names.add(name));
-    });
-    teachers.innerHTML = [...names]
-        .map((name) => `<option value="${esc(name)}"></option>`)
-        .join("");
+function normKey(value) {
+    return String(value || "").trim().toLocaleLowerCase("ru").replace(/\s+/g, " ");
 }
 
-function groupOptions(selectedId) {
-    const byCourse = new Map();
+function teacherLabels(teacher) {
+    return [...new Set(
+        [paperTeacher(teacher.full_name), teacher.short_name, teacher.full_name]
+            .map((value) => String(value || "").trim())
+            .filter(Boolean),
+    )];
+}
+
+function indexCatalog() {
+    state.groupByName = new Map();
     state.groups.forEach((group) => {
-        const course = Number(group.course) || 1;
-        if (!byCourse.has(course)) {
-            byCourse.set(course, []);
-        }
-        byCourse.get(course).push(group);
+        state.groupByName.set(normKey(group.name), group);
     });
-    const groups = [...byCourse.keys()]
-        .sort((a, b) => a - b)
-        .map((course) => {
-            const options = byCourse
-                .get(course)
-                .slice()
-                .sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"))
-                .map((group) => {
-                    const selected = String(group.id) === String(selectedId) ? " selected" : "";
-                    return `<option value="${group.id}"${selected}>${esc(group.name)}</option>`;
-                })
-                .join("");
-            return `<optgroup label="${course} курс">${options}</optgroup>`;
+    state.subjectByName = new Map();
+    state.subjects.forEach((subject) => {
+        state.subjectByName.set(normKey(subject.name), subject);
+        if (subject.short_name) {
+            state.subjectByName.set(normKey(subject.short_name), subject);
+        }
+    });
+    state.teacherByName = new Map();
+    state.teachers.forEach((teacher) => {
+        teacherLabels(teacher).forEach((label) => {
+            state.teacherByName.set(normKey(label), teacher);
+        });
+    });
+}
+
+function findGroup(name) {
+    return state.groupByName.get(normKey(name)) || null;
+}
+
+function findSubject(name) {
+    return state.subjectByName.get(normKey(name)) || null;
+}
+
+function findTeacher(name) {
+    return state.teacherByName.get(normKey(name)) || null;
+}
+
+function subjectsFor(group, teacher) {
+    if (!group && !teacher) {
+        return state.subjects;
+    }
+    const ids = new Set();
+    if (group && teacher) {
+        state.links.forEach((link) => {
+            if (link.groupId === group.id && link.teacherId === teacher.id && link.subjectId) {
+                ids.add(link.subjectId);
+            }
+        });
+        return state.subjects.filter((subject) => ids.has(subject.id));
+    }
+    if (group) {
+        state.links.forEach((link) => {
+            if (link.groupId === group.id && link.subjectId) {
+                ids.add(link.subjectId);
+            }
+        });
+        return state.subjects.filter((subject) => ids.has(subject.id));
+    }
+    state.teacherSubjects.forEach((link) => {
+        if (Number(link.teacher_id) === teacher.id) {
+            ids.add(Number(link.subject_id));
+        }
+    });
+    state.links.forEach((link) => {
+        if (link.teacherId === teacher.id && link.subjectId) {
+            ids.add(link.subjectId);
+        }
+    });
+    return state.subjects.filter((subject) => ids.has(subject.id));
+}
+
+function teachersFor(group, subject) {
+    if (!group && !subject) {
+        return state.teachers;
+    }
+    const ids = new Set();
+    if (group && subject) {
+        state.links.forEach((link) => {
+            if (link.groupId === group.id && link.subjectId === subject.id) {
+                ids.add(link.teacherId);
+            }
+        });
+        return state.teachers.filter((teacher) => ids.has(teacher.id));
+    }
+    if (group) {
+        state.links.forEach((link) => {
+            if (link.groupId === group.id) {
+                ids.add(link.teacherId);
+            }
+        });
+        return state.teachers.filter((teacher) => ids.has(teacher.id));
+    }
+    state.teacherSubjects.forEach((link) => {
+        if (Number(link.subject_id) === subject.id) {
+            ids.add(Number(link.teacher_id));
+        }
+    });
+    state.links.forEach((link) => {
+        if (link.subjectId === subject.id) {
+            ids.add(link.teacherId);
+        }
+    });
+    return state.teachers.filter((teacher) => ids.has(teacher.id));
+}
+
+function fillGroupList() {
+    const node = $("#group-options");
+    if (!node) {
+        return;
+    }
+    const names = state.groups
+        .slice()
+        .sort((a, b) => {
+            const course = (Number(a.course) || 0) - (Number(b.course) || 0);
+            if (course) {
+                return course;
+            }
+            return String(a.name).localeCompare(String(b.name), "ru");
         })
-        .join("");
-    return `<option value="">Группа…</option>${groups}`;
+        .map((group) => group.name);
+    node.innerHTML = names.map((name) => `<option value="${esc(name)}"></option>`).join("");
+}
+
+function setOptions(listId, values) {
+    const node = document.getElementById(listId);
+    if (!node) {
+        return;
+    }
+    const unique = [];
+    const seen = new Set();
+    values.forEach((value) => {
+        const text = String(value || "").trim();
+        const key = normKey(text);
+        if (!text || seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        unique.push(text);
+    });
+    unique.sort((a, b) => a.localeCompare(b, "ru"));
+    node.innerHTML = unique.map((value) => `<option value="${esc(value)}"></option>`).join("");
+}
+
+function fieldValue(row, name) {
+    const node = row.querySelector(`[data-field="${name}"]`);
+    return node ? node.value : "";
+}
+
+function refreshRowSuggestions(row, skipField) {
+    const group = findGroup(fieldValue(row, "group_name"));
+    [
+        ["new_subject", "new_teacher"],
+        ["old_subject", "absent_teacher"],
+    ].forEach(([subjectField, teacherField]) => {
+        const subject = findSubject(fieldValue(row, subjectField));
+        const teacher = findTeacher(fieldValue(row, teacherField));
+        if (skipField !== subjectField) {
+            const listId = row.querySelector(`[data-field="${subjectField}"]`)?.getAttribute("list");
+            setOptions(listId, subjectsFor(group, teacher).map((item) => item.name));
+        }
+        if (skipField !== teacherField) {
+            const listId = row.querySelector(`[data-field="${teacherField}"]`)?.getAttribute("list");
+            const labels = [];
+            teachersFor(group, subject).forEach((item) => labels.push(...teacherLabels(item)));
+            setOptions(listId, labels);
+        }
+    });
+}
+
+function groupLabel(row) {
+    if (row.group_name) {
+        return row.group_name;
+    }
+    const group = state.groups.find((item) => String(item.id) === String(row.group_id || ""));
+    return group ? group.name : "";
+}
+
+function suggestionList() {
+    suggestionSeq += 1;
+    return `suggest-${suggestionSeq}`;
 }
 
 function blankRow() {
@@ -180,28 +332,36 @@ function renderList() {
 
 function rowHtml(row, locked) {
     const disabled = locked ? " disabled" : "";
+    const newSubjectList = suggestionList();
+    const newTeacherList = suggestionList();
+    const oldSubjectList = suggestionList();
+    const absentTeacherList = suggestionList();
     return `
         <tr>
             <td>
-                <select data-field="group_id"${disabled}>${groupOptions(row.group_id || "")}</select>
+                <input data-field="group_name" list="group-options" autocomplete="off" value="${esc(groupLabel(row))}"${disabled}>
             </td>
             <td class="period">
                 <input data-field="periods" value="${esc(row.periods_label || "")}" placeholder="3,4"${disabled}>
             </td>
             <td>
-                <input data-field="new_subject" list="subject-options" value="${esc(row.new_subject || "")}"${disabled}>
+                <input data-field="new_subject" list="${newSubjectList}" autocomplete="off" value="${esc(row.new_subject || "")}"${disabled}>
+                <datalist id="${newSubjectList}"></datalist>
             </td>
             <td class="room">
                 <input data-field="new_room" value="${esc(row.new_room || "")}" placeholder="407"${disabled}>
             </td>
             <td>
-                <input data-field="new_teacher" list="teacher-options" value="${esc(row.new_teacher || "")}"${disabled}>
+                <input data-field="new_teacher" list="${newTeacherList}" autocomplete="off" value="${esc(row.new_teacher || "")}"${disabled}>
+                <datalist id="${newTeacherList}"></datalist>
             </td>
             <td>
-                <input data-field="old_subject" list="subject-options" value="${esc(row.old_subject || "")}"${disabled}>
+                <input data-field="old_subject" list="${oldSubjectList}" autocomplete="off" value="${esc(row.old_subject || "")}"${disabled}>
+                <datalist id="${oldSubjectList}"></datalist>
             </td>
             <td>
-                <input data-field="absent_teacher" list="teacher-options" value="${esc(row.absent_teacher || "")}"${disabled}>
+                <input data-field="absent_teacher" list="${absentTeacherList}" autocomplete="off" value="${esc(row.absent_teacher || "")}"${disabled}>
+                <datalist id="${absentTeacherList}"></datalist>
             </td>
             <td class="row-actions">
                 ${
@@ -313,6 +473,7 @@ function renderEditor() {
             ${notify}
         </section>
     `;
+    root.querySelectorAll("#change-rows tr").forEach((row) => refreshRowSuggestions(row));
 }
 
 function render() {
@@ -327,11 +488,11 @@ function markDirty() {
 function readSheetFromDom() {
     const sheet = state.current;
     const rows = [...document.querySelectorAll("#change-rows tr")].map((row) => {
-        const group = row.querySelector("[data-field='group_id']");
-        const option = group.selectedOptions[0];
+        const groupName = row.querySelector("[data-field='group_name']").value.trim();
+        const group = findGroup(groupName);
         return {
-            group_id: group.value,
-            group_name: group.value ? option.textContent.trim() : "",
+            group_id: group ? group.id : "",
+            group_name: groupName,
             periods: row.querySelector("[data-field='periods']").value,
             new_subject: row.querySelector("[data-field='new_subject']").value,
             new_room: row.querySelector("[data-field='new_room']").value,
@@ -516,6 +677,17 @@ function bindEditor() {
         if (event.target.closest("#change-rows, #sheet-date")) {
             markDirty();
         }
+        const field = event.target.closest("#change-rows [data-field]");
+        if (field) {
+            refreshRowSuggestions(field.closest("tr"), field.dataset.field);
+        }
+    });
+    $("#editor").addEventListener("focusin", (event) => {
+        const field = event.target.closest("#change-rows [data-field]");
+        if (!field || field.dataset.field === "periods" || field.dataset.field === "new_room") {
+            return;
+        }
+        refreshRowSuggestions(field.closest("tr"));
     });
     $("#editor").addEventListener("change", (event) => {
         if (event.target.id === "sheet-date") {
@@ -638,7 +810,14 @@ async function init() {
     state.groups = bootstrap.groups || [];
     state.subjects = bootstrap.subjects || [];
     state.teachers = bootstrap.teachers || [];
-    fillLists();
+    state.teacherSubjects = bootstrap.teacher_subjects || [];
+    state.links = (bootstrap.schedule_links || []).map((link) => ({
+        groupId: Number(link.group_id),
+        teacherId: Number(link.teacher_id),
+        subjectId: Number(link.subject_id),
+    }));
+    indexCatalog();
+    fillGroupList();
     await refreshList();
     render();
     bindEditor();

@@ -131,6 +131,24 @@ def bootstrap():
                     "SELECT teacher_id, subject_id FROM teacher_subjects"
                 )
             ],
+            "schedule_links": [
+                {
+                    "group_id": row["group_id"],
+                    "teacher_id": row["teacher_id"],
+                    "subject_id": row["subject_id"],
+                }
+                for row in db.execute(
+                    """
+                    SELECT DISTINCT group_id, teacher_id, subject_id
+                    FROM lessons
+                    WHERE subject_id IS NOT NULL
+                    UNION
+                    SELECT DISTINCT group_id, teacher2_id AS teacher_id, subject_id
+                    FROM lessons
+                    WHERE teacher2_id IS NOT NULL AND subject_id IS NOT NULL
+                    """
+                )
+            ],
         }
     )
 

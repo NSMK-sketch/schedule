@@ -172,6 +172,14 @@ class ScheduleAppTestCase(unittest.TestCase):
         bootstrap = self.client.get("/api/bootstrap").get_json()
         group = next(item for item in bootstrap["groups"] if item["id"] == 1)
         self.assertEqual(group["course"], 3)
+        group_one = {
+            (item["teacher_id"], item["subject_id"])
+            for item in bootstrap["schedule_links"]
+            if item["group_id"] == 1
+        }
+        self.assertIn((1, 1), group_one)
+        self.assertIn((1, 2), group_one)
+        self.assertIn((2, 4), group_one)
 
     def test_lesson_update_not_hijacked_by_reference_route(self):
         self.client.post(
