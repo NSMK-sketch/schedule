@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask, abort, redirect, render_template, request, session, url_for
+from flask import Flask, abort, redirect, render_template, request, send_file, session, url_for
 
 from app.config import Config, ensure_secret_key
 from app.database import init_db
@@ -45,6 +45,10 @@ def create_app(test_config=None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
         return response
+
+    @app.get("/favicon.ico")
+    def favicon():
+        return send_file(BASE_DIR / "static" / "Logo.ico", mimetype="image/x-icon")
 
     @app.get("/")
     def index():
