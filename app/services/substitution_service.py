@@ -702,12 +702,7 @@ def _group_matches(row, group_id, group_name):
 
 
 def _school_span(today):
-    """Monday–Saturday that contains today.
-
-    A substitution is shown in the student grid only inside this span.
-    The next time that weekday comes around, the ordinary lessons are back.
-    Sunday is between weeks: nothing is overlaid.
-    """
+    """Monday–Saturday that contains today. Sunday is between weeks."""
     if today.weekday() == 6:
         return None
     monday = today - timedelta(days=today.weekday())
@@ -715,16 +710,14 @@ def _school_span(today):
 
 
 def substitutions_for_group(group_id, group_name, today=None):
-    """Split published rows into this school week and later dates.
+    """Published substitutions from today through the next three weeks.
 
-    `current` replaces lessons on the sheet's weekday.
-    `upcoming` is only a notice: those dates keep the ordinary schedule
-    until their own week begins.
+    They replace the matching weekday in the timetable as soon as they are
+    published, including tomorrow. The next calendar day they are gone and
+    the ordinary lessons return. For one weekday only the nearest date is
+    kept, so a later sheet does not cover today's pairs.
     """
     today = today or school_today()
-    span = _school_span(today)
-    week_end = span[1] if span else today
-    earliest = span[0] if span else today + timedelta(days=1)
     horizon = today + timedelta(days=21)
     db = get_db()
     sheets = db.execute(
@@ -737,10 +730,9 @@ def substitutions_for_group(group_id, group_name, today=None):
         WHERE status = 'published' AND sheet_date >= ?
         ORDER BY sheet_date, id
         """,
-        (earliest.isoformat(),),
+        (today.isoformat(),),
     ).fetchall()
-    current = []
-    upcoming = []
+    grouped = {}
     for sheet in sheets:
         sheet_day = datetime.strptime(sheet["sheet_date"], "%Y-%m-%d").date()
         if sheet_day > horizon:
@@ -755,10 +747,12 @@ def substitutions_for_group(group_id, group_name, today=None):
         payload = _serialize_sheet(sheet, [])
         payload["rows"] = rows
         payload["row_count"] = len(rows)
-        if span and span[0] <= sheet_day <= span[1]:
-            payload["applies"] = True
-            current.append(payload)
-        elif sheet_day > week_end:
-            payload["applies"] = False
-            upcoming.append(payload)
-    return {"current": current, "upcoming": upcoming}
+        payload["applies"] = True
+        key = (int(sheet["week"]), int(sheet["weekday"]))
+        grouped.setdefault(key, []).append((sheet_day, payload))
+    current = []
+    for items in grouped.values():
+        nearest = min(day for day, _payload in items)
+        current.extend(payload for day, payload in items if day == nearest)
+    current.sort(key=lambda item: (item["sheet_date"], item["id"]))
+    return {"current": current, "upcoming": []}

@@ -1177,25 +1177,58 @@ class SubstitutionTestCase(unittest.TestCase):
         view = self.client.get("/api/public/schedule?group_id=1&week=2").get_json()
         self.assertEqual(view["lessons"], before["lessons"])
         current_dates = [item["sheet_date"] for item in view["substitutions"]]
-        later_dates = [item["sheet_date"] for item in view["upcoming_substitutions"]]
-        self.assertNotIn(past_day.isoformat(), current_dates + later_dates)
-        self.assertIn(next_day.isoformat(), later_dates)
-        self.assertNotIn(next_day.isoformat(), current_dates)
-        if this_day is not None:
+        self.assertEqual(view["upcoming_substitutions"], [])
+        self.assertNotIn(past_day.isoformat(), current_dates)
+        from app.services.substitution_service import school_today
+
+        today = school_today()
+        if this_day is not None and this_day >= today:
             self.assertIn(this_day.isoformat(), current_dates)
-            self.assertTrue(view["substitutions"][0]["applies"])
-            page = self.client.get(f"/changes/{view['substitutions'][0]['id']}")
+            self.assertNotIn(next_day.isoformat(), current_dates)
+            shown = next(item for item in view["substitutions"] if item["sheet_date"] == this_day.isoformat())
+            self.assertTrue(shown["applies"])
+            page = self.client.get(f"/changes/{shown['id']}")
             self.assertEqual(page.status_code, 200)
             html = page.get_data(as_text=True)
             self.assertIn("черновик (ауд.407)", html)
             self.assertIn("МемишеваГП", html)
             self.assertIn("обычное расписание", html)
+        elif this_day is not None:
+            self.assertNotIn(this_day.isoformat(), current_dates)
+            self.assertIn(next_day.isoformat(), current_dates)
         else:
-            self.assertEqual(current_dates, [])
+            self.assertIn(next_day.isoformat(), current_dates)
 
         other = self.client.get("/api/public/schedule?group_id=2&week=2").get_json()
         self.assertEqual(other["substitutions"], [])
         self.assertEqual(other["upcoming_substitutions"], [])
+
+    def test_substitution_shows_ahead_and_leaves_the_next_day(self):
+        from datetime import date
+
+        from app.services.substitution_service import substitutions_for_group
+
+        self._login_admin()
+        past = self._create(date(2026, 10, 23), "вчера")
+        tomorrow = self._create(date(2026, 10, 27), "завтра")
+        later_same_day = self._create(date(2026, 11, 6), "потом")
+        nearer_friday = self._create(date(2026, 10, 30), "пятница")
+        self.client.post(f"/api/substitutions/{past['id']}/publish")
+        self.client.post(f"/api/substitutions/{tomorrow['id']}/publish")
+        self.client.post(f"/api/substitutions/{later_same_day['id']}/publish")
+        self.client.post(f"/api/substitutions/{nearer_friday['id']}/publish")
+
+        with self.app.app_context():
+            today = substitutions_for_group(1, "П-21", today=date(2026, 10, 26))
+            after = substitutions_for_group(1, "П-21", today=date(2026, 10, 28))
+        today_dates = [item["sheet_date"] for item in today["current"]]
+        self.assertEqual(today["upcoming"], [])
+        self.assertIn("2026-10-27", today_dates)
+        self.assertIn("2026-10-30", today_dates)
+        self.assertNotIn("2026-10-23", today_dates)
+        self.assertNotIn("2026-11-06", today_dates)
+        self.assertTrue(all(item["applies"] for item in today["current"]))
+        self.assertNotIn("2026-10-27", [item["sheet_date"] for item in after["current"]])
 
     def test_teacher_cannot_edit_substitutions(self):
         self.client.post(

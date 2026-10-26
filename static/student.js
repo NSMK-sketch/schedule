@@ -244,50 +244,6 @@ function changeCard(day, row) {
     `;
 }
 
-function renderChangeNotes() {
-    const current = state.substitutions || [];
-    const upcoming = state.upcoming || [];
-    if (!current.length && !upcoming.length) {
-        return "";
-    }
-    const currentHtml = current
-        .map((sheet) => {
-            const here = Number(sheet.week) === Number(state.week);
-            const action = here
-                ? `<span class="changes-here">показаны ниже</span>`
-                : `<button type="button" data-switch-week="${sheet.week}">Показать ${sheet.week}-ю неделю</button>`;
-            return `
-                <div class="changes-banner-item">
-                    <div>
-                        <b>Замена на ${esc(sheet.date_label)}</b>
-                        <span>${esc(sheet.weekday_label)}, ${sheet.week}-я неделя. Только в эту дату, потом снова обычные пары.</span>
-                    </div>
-                    <div class="changes-banner-actions">
-                        ${action}
-                        <a href="${esc(sheet.url)}">Таблица</a>
-                    </div>
-                </div>
-            `;
-        })
-        .join("");
-    const upcomingHtml = upcoming
-        .map(
-            (sheet) => `
-                <div class="changes-banner-item is-later">
-                    <div>
-                        <b>${esc(sheet.date_label)}</b>
-                        <span>${esc(sheet.weekday_label)}, ${sheet.week}-я неделя. Сейчас в сетке обычные пары — замена откроется только на той неделе.</span>
-                    </div>
-                    <div class="changes-banner-actions">
-                        <a href="${esc(sheet.url)}">Таблица</a>
-                    </div>
-                </div>
-            `,
-        )
-        .join("");
-    return `<section class="changes-banner">${currentHtml}${upcomingHtml}</section>`;
-}
-
 function renderSchedule() {
     const root = $("#schedule-root");
     if (!state.groupId) {
@@ -299,12 +255,11 @@ function renderSchedule() {
         return;
     }
 
-    const banner = renderChangeNotes();
     const hasLessons = state.lessons.length > 0;
     const hasCurrent = (state.substitutions || []).some(
         (sheet) => Number(sheet.week) === Number(state.week),
     );
-    if (!hasLessons && !hasCurrent && !banner) {
+    if (!hasLessons && !hasCurrent) {
         root.innerHTML = `
             <div class="empty-state">
                 <p>На эту неделю занятий нет.</p>
@@ -367,7 +322,7 @@ function renderSchedule() {
     }
 
     const empty = `<div class="empty-state"><p>На эту неделю занятий нет.</p></div>`;
-    root.innerHTML = `${banner}${parts.length ? parts.join("") : empty}`;
+    root.innerHTML = parts.length ? parts.join("") : empty;
 }
 
 async function loadSchedule() {
@@ -492,14 +447,6 @@ async function init() {
 
     $("#group-select").addEventListener("change", (event) => {
         setGroup(event.target.value);
-    });
-
-    $("#schedule-root").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-switch-week]");
-        if (!button) {
-            return;
-        }
-        setWeek(Number(button.dataset.switchWeek));
     });
 
     document.querySelectorAll(".week-btn").forEach((button) => {
