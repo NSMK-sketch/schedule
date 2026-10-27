@@ -59,6 +59,33 @@ class ScheduleAppTestCase(unittest.TestCase):
     def tearDown(self):
         _cleanup_db(self.db_path)
 
+    def test_teacher_schedule_lists_only_that_teachers_lessons(self):
+        page = self.client.get("/teacher")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("teacher-select", page.get_data(as_text=True))
+
+        teachers = self.client.get("/api/public/teachers").get_json()
+        ivanov = next(item for item in teachers if item["full_name"].startswith("Иванов"))
+        petrova = next(item for item in teachers if item["full_name"].startswith("Петрова"))
+
+        own = self.client.get(
+            f"/api/public/teacher-schedule?teacher_id={ivanov['id']}&week=1"
+        ).get_json()
+        self.assertEqual(own["teacher"]["id"], ivanov["id"])
+        self.assertTrue(own["lessons"])
+        self.assertTrue(all(item["group_name"] == "П-21" for item in own["lessons"]))
+        self.assertIn("Информатика", [item["subject_name"] for item in own["lessons"]])
+        self.assertNotIn("Математика", [item["subject_name"] for item in own["lessons"]])
+
+        other = self.client.get(
+            f"/api/public/teacher-schedule?teacher_id={petrova['id']}&week=1"
+        ).get_json()
+        self.assertIn("Математика", [item["subject_name"] for item in other["lessons"]])
+        self.assertNotIn("Информатика", [item["subject_name"] for item in other["lessons"]])
+
+        missing = self.client.get("/api/public/teacher-schedule?teacher_id=999&week=1")
+        self.assertEqual(missing.status_code, 404)
+
     def test_health(self):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
@@ -1229,6 +1256,39 @@ class SubstitutionTestCase(unittest.TestCase):
         self.assertNotIn("2026-11-06", today_dates)
         self.assertTrue(all(item["applies"] for item in today["current"]))
         self.assertNotIn("2026-10-27", [item["sheet_date"] for item in after["current"]])
+
+    def test_teacher_schedule_shows_replacement_and_hides_absent_lesson(self):
+        from datetime import date
+
+        self._login_admin()
+        monday = date(2026, 11, 2)
+        sheet = self._create(monday, "замена у Петровой")
+        self.client.put(
+            f"/api/substitutions/{sheet['id']}",
+            json={
+                "sheet_date": monday.isoformat(),
+                "week": 1,
+                "rows": [
+                    {
+                        "group_id": 1,
+                        "periods": "1",
+                        "new_subject": "замена у Петровой",
+                        "new_teacher": "Петрова Анна Ивановна",
+                        "old_subject": "Информатика",
+                        "absent_teacher": "Иванов Сергей Владимирович",
+                    }
+                ],
+            },
+        )
+        self.client.post(f"/api/substitutions/{sheet['id']}/publish")
+
+        ivanov = self.client.get("/api/public/teacher-schedule?teacher_id=1&week=1").get_json()
+        petrova = self.client.get("/api/public/teacher-schedule?teacher_id=2&week=1").get_json()
+        self.assertTrue(ivanov["substitutions"])
+        self.assertTrue(ivanov["substitutions"][0]["rows"][0]["for_absent"])
+        self.assertFalse(ivanov["substitutions"][0]["rows"][0]["for_new"])
+        self.assertTrue(petrova["substitutions"][0]["rows"][0]["for_new"])
+        self.assertEqual(petrova["substitutions"][0]["rows"][0]["group_name"], "П-21")
 
     def test_teacher_cannot_edit_substitutions(self):
         self.client.post(

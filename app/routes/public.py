@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, jsonify, request
 from app.database import get_db
 from app.services.lesson_service import list_lessons
 from app.services.max_init_data import validate_init_data
-from app.services.substitution_service import substitutions_for_group
+from app.services.substitution_service import substitutions_for_group, substitutions_for_teacher
 
 
 public_bp = Blueprint("public", __name__)
@@ -53,6 +53,64 @@ def public_groups():
         """
     ).fetchall()
     return jsonify([_serialize_group(row) for row in rows])
+
+
+@public_bp.get("/teachers")
+def public_teachers():
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT id, full_name, short_name
+        FROM teachers
+        ORDER BY full_name
+        """
+    ).fetchall()
+    return jsonify(
+        [
+            {
+                "id": row["id"],
+                "full_name": row["full_name"],
+                "short_name": row["short_name"] or "",
+            }
+            for row in rows
+        ]
+    )
+
+
+@public_bp.get("/teacher-schedule")
+def public_teacher_schedule():
+    teacher_id = request.args.get("teacher_id", type=int)
+    week = request.args.get("week", type=int)
+    if not teacher_id:
+        return jsonify({"error": "Укажите преподавателя."}), 400
+    if week not in (1, 2, None):
+        return jsonify({"error": "Неделя должна быть 1 или 2."}), 400
+
+    changes = substitutions_for_teacher(teacher_id)
+    if changes is None:
+        return jsonify({"error": "Преподаватель не найден."}), 404
+
+    lessons = []
+    for item in list_lessons(week=week, teacher_id=teacher_id):
+        payload = _serialize_public_lesson(item)
+        secondary = (
+            item["teacher2_id"] is not None
+            and int(item["teacher2_id"]) == teacher_id
+            and int(item["teacher_id"]) != teacher_id
+        )
+        if secondary and item["classroom2_name"]:
+            payload["classroom_name"] = item["classroom2_name"]
+            payload["classroom2_name"] = None
+        lessons.append(payload)
+
+    return jsonify(
+        {
+            "teacher": changes["teacher"],
+            "week": week,
+            "lessons": lessons,
+            "substitutions": changes["current"],
+        }
+    )
 
 
 @public_bp.get("/schedule")

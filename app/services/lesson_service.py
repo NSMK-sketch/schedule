@@ -33,7 +33,7 @@ def _touch_draft(db, draft_id):
     )
 
 
-def list_lessons(week=None, group_id=None, draft_id=None):
+def list_lessons(week=None, group_id=None, draft_id=None, teacher_id=None):
     query = f"""
         SELECT
             lessons.*,
@@ -73,6 +73,10 @@ def list_lessons(week=None, group_id=None, draft_id=None):
     if group_id:
         query += " AND lessons.group_id = ?"
         params.append(group_id)
+
+    if teacher_id:
+        query += " AND (lessons.teacher_id = ? OR lessons.teacher2_id = ?)"
+        params.extend((int(teacher_id), int(teacher_id)))
 
     query += " ORDER BY lessons.week, lessons.weekday, lessons.period, lessons.id"
     return [dict(row) for row in get_db().execute(query, params)]

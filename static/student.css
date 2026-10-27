@@ -65,13 +65,27 @@ body {
     object-position: left center;
 }
 
-.student-title {
+.student-heading {
     margin-left: auto;
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+}
+
+.student-title {
     font-family: var(--font-display);
     font-size: 15px;
     font-weight: 700;
     color: var(--text);
     text-align: right;
+    white-space: nowrap;
+}
+
+.audience-link {
+    color: var(--brick);
+    font-size: 13px;
+    font-weight: 800;
+    text-decoration: none;
     white-space: nowrap;
 }
 

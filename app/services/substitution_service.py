@@ -709,14 +709,23 @@ def _school_span(today):
     return monday, monday + timedelta(days=5)
 
 
-def substitutions_for_group(group_id, group_name, today=None):
-    """Published substitutions from today through the next three weeks.
+def _teacher_name_keys(full_name, short_name):
+    keys = set()
+    for value in (full_name, short_name):
+        key = _norm_name(value)
+        if key:
+            keys.add(key)
+    parts = str(full_name or "").split()
+    if len(parts) >= 2:
+        initials = "".join(part[0] for part in parts[1:] if part)
+        if initials:
+            keys.add(_norm_name(parts[0] + initials))
+            keys.add(_norm_name(f"{parts[0]} {initials}"))
+    return keys
 
-    They replace the matching weekday in the timetable as soon as they are
-    published, including tomorrow. The next calendar day they are gone and
-    the ordinary lessons return. For one weekday only the nearest date is
-    kept, so a later sheet does not cover today's pairs.
-    """
+
+def _collect_published(today, keep_row):
+    """Nearest published sheet per week and weekday, with rows kept by keep_row."""
     today = today or school_today()
     horizon = today + timedelta(days=21)
     db = get_db()
@@ -737,11 +746,11 @@ def substitutions_for_group(group_id, group_name, today=None):
         sheet_day = datetime.strptime(sheet["sheet_date"], "%Y-%m-%d").date()
         if sheet_day > horizon:
             continue
-        rows = [
-            _serialize_row(row)
-            for row in _rows_for(db, sheet["id"])
-            if _group_matches(row, group_id, group_name)
-        ]
+        rows = []
+        for raw in _rows_for(db, sheet["id"]):
+            item = _serialize_row(raw)
+            if keep_row(item):
+                rows.append(item)
         if not rows:
             continue
         payload = _serialize_sheet(sheet, [])
@@ -755,4 +764,50 @@ def substitutions_for_group(group_id, group_name, today=None):
         nearest = min(day for day, _payload in items)
         current.extend(payload for day, payload in items if day == nearest)
     current.sort(key=lambda item: (item["sheet_date"], item["id"]))
+    return current
+
+
+def substitutions_for_group(group_id, group_name, today=None):
+    """Published substitutions from today through the next three weeks.
+
+    They replace the matching weekday in the timetable as soon as they are
+    published, including tomorrow. The next calendar day they are gone and
+    the ordinary lessons return. For one weekday only the nearest date is
+    kept, so a later sheet does not cover today's pairs.
+    """
+    current = _collect_published(
+        today,
+        lambda row: _group_matches(row, group_id, group_name),
+    )
     return {"current": current, "upcoming": []}
+
+
+def substitutions_for_teacher(teacher_id, today=None):
+    """Rows where this teacher substitutes or is the one being replaced."""
+    db = get_db()
+    teacher = db.execute(
+        "SELECT id, full_name, short_name FROM teachers WHERE id = ?",
+        (int(teacher_id),),
+    ).fetchone()
+    if teacher is None:
+        return None
+    keys = _teacher_name_keys(teacher["full_name"], teacher["short_name"])
+
+    def keep(row):
+        new_name = _norm_name(row["new_teacher"])
+        absent_name = _norm_name(row["absent_teacher"])
+        return new_name in keys or absent_name in keys
+
+    current = _collect_published(today, keep)
+    for sheet in current:
+        for row in sheet["rows"]:
+            row["for_new"] = _norm_name(row["new_teacher"]) in keys
+            row["for_absent"] = _norm_name(row["absent_teacher"]) in keys
+    return {
+        "teacher": {
+            "id": teacher["id"],
+            "full_name": teacher["full_name"],
+            "short_name": teacher["short_name"] or "",
+        },
+        "current": current,
+    }

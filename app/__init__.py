@@ -54,6 +54,10 @@ def create_app(test_config=None):
     def index():
         return render_template("student.html")
 
+    @app.get("/teacher")
+    def teacher():
+        return render_template("teacher.html")
+
     @app.get("/student")
     def student_legacy():
         """Old mini-app path from MAX; keep working until the bot URL is updated."""
